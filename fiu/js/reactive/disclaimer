@@ -1,0 +1,4 @@
+This is not heavily inspired by rxjs, this is rxjs! I just plucked what I deemed not a complication and assembled this
+"package". I was, however, mindful enough to not change the overall API and names of the entities, so you can easily
+refer the rxjs documentation for basic usage (but again, I did pluck a bunch of stuff out, so it's not the same). This
+way I can use what I need from rxjs and avoid npm, which is one of the goals.

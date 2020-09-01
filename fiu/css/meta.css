@@ -1,0 +1,4 @@
+.inline-block-children {letter-spacing:-4px;}
+.inline-block-children > * {letter-spacing:normal;word-spacing:normal;vertical-align:top;display:inline-block;}
+router-outlet {display:block;width:100%;}
+[route] {cursor:pointer;}
