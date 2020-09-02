@@ -1,5 +1,5 @@
 import { Observable } from './observable.js';
-import { SubjectSubscription, Subscription } from './subscription.js';
+import { SubjectSubscription, Subscription } from './subscriber.js';
 
 export class Subject extends Observable {
 	observers = [];

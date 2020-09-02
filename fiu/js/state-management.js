@@ -26,6 +26,11 @@ class State extends BehaviorSubject {
 					slice: action.slice,
 					state: this.store,
 				});
+			} else {
+				this.next({
+					slice: 'initial',
+					state: this.store,
+				});
 			}
 		});
 	}
@@ -65,9 +70,12 @@ export class Store extends Observable {
 		this.action$.next(action);
 	}
 
-	select(slice) { // Must return an PubSub, so one can pipe the updated state when it is updated
+	select(slice) { // Must return an Observable, so one can pipe the updated state when it is updated
 		return this.pipe(
-			filter(update => update.slice === slice),
+			filter(update => {
+				return (update.slice === slice || update.slice === 'initial') &&
+					Object.keys(update.state).length !== 0 && update.state.constructor === Object
+			}),
 			pluck('state', ...slice.split('/')),
 			tap(() => {
 				localStorage.setItem(Store.STORE_KEY, JSON.stringify(store));

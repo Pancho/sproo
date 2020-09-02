@@ -184,6 +184,7 @@ export class Component extends HTMLElement {
 		Object.keys(injections).forEach((propertyName) => {
 			this[propertyName] = injections[propertyName];
 		});
+		this.logger = App.loggerFactory.getLogger(clazz);
 
 		if (!!clazz.registerComponents) {
 			clazz.registerComponents.forEach((component) => {

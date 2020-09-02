@@ -1,6 +1,26 @@
 import { EmptyObservable } from './observable.js';
 import { InnerSubscriber, OuterSubscriber, Subscriber } from './subscriber.js';
-import { subscribeToResult } from './utils.js';
+
+function subscribeToResult(outerSubscriber, result, outerValue, outerIndex) {
+	let destination = new InnerSubscriber(outerSubscriber, outerValue, outerIndex);
+	if (destination.closed) {
+		return null;
+	}
+	if (result instanceof Observable) {
+		destination.syncErrorThrowable = true;
+		return result.subscribe(destination);
+	} else if (!!result && Array.isArray(result)) {
+		for (let i = 0, len = result.length; i < len && !destination.closed; i += 1) {
+			destination.next(result[i]);
+		}
+		if (!destination.closed) {
+			destination.complete();
+		}
+	} else {
+		destination.error(new TypeError('Must provide a stream'));
+	}
+	return null;
+}
 
 class SnapshotSubscriber extends Subscriber {
 	constructor(destination, prefix) {
@@ -8,14 +28,14 @@ class SnapshotSubscriber extends Subscriber {
 		this.prefix = prefix;
 	}
 
-    _next(value) {
+	_next(value) {
 		if (this.prefix) {
 			console.log(this.prefix, value);
 		} else {
 			console.log(value);
 		}
-        this.destination.next(value);
-    }
+		this.destination.next(value);
+	}
 }
 
 export function snapshot(prefix) {
@@ -34,13 +54,13 @@ class PluckSubscriber extends Subscriber {
 
 	_next(value) {
 		let result;
-        try {
-            result = this.path.reduce((newValue, slice) => newValue[slice], value);
-        } catch (err) {
-            this.destination.error(err);
-            return;
-        }
-        this.destination.next(result);
+		try {
+			result = this.path.reduce((newValue, slice) => newValue[slice], value);
+		} catch (err) {
+			this.destination.error(err);
+			return;
+		}
+		this.destination.next(result);
 	}
 }
 
@@ -53,23 +73,23 @@ export function pluck(...path) {
 }
 
 class MapSubscriber extends Subscriber {
-    constructor(destination, projector, thisArg) {
-        super(destination);
-        this.projector = projector;
-        this.count = 0;
-        this.thisArg = thisArg || this;
-    }
+	constructor(destination, projector, thisArg) {
+		super(destination);
+		this.projector = projector;
+		this.count = 0;
+		this.thisArg = thisArg || this;
+	}
 
-    _next(value) {
-        let result;
-        try {
-            result = this.projector.call(this.thisArg, value, this.count++);
-        } catch (err) {
-            this.destination.error(err);
-            return;
-        }
-        this.destination.next(result);
-    }
+	_next(value) {
+		let result;
+		try {
+			result = this.projector.call(this.thisArg, value, this.count++);
+		} catch (err) {
+			this.destination.error(err);
+			return;
+		}
+		this.destination.next(result);
+	}
 }
 
 export function map(projector, thisArg) {
@@ -81,14 +101,14 @@ export function map(projector, thisArg) {
 }
 
 class MapToSubscriber extends Subscriber {
-    constructor(destination, value) {
-        super(destination);
-        this.value = value;
-    }
+	constructor(destination, value) {
+		super(destination);
+		this.value = value;
+	}
 
-    _next(value) {
-        this.destination.next(this.value);
-    }
+	_next(value) {
+		this.destination.next(this.value);
+	}
 }
 
 export function mapTo(value) {
@@ -100,24 +120,24 @@ export function mapTo(value) {
 }
 
 class FilterSubscriber extends Subscriber {
-    constructor(destination, predicate) {
-        super(destination);
-        this.predicate = predicate;
-        this.count = 0;
-    }
+	constructor(destination, predicate) {
+		super(destination);
+		this.predicate = predicate;
+		this.count = 0;
+	}
 
-    _next(value) {
-        let result;
-        try {
-            result = this.predicate(value, this.count++);
-        } catch (err) {
-            this.destination.error(err);
-            return;
-        }
-        if (result) {
-            this.destination.next(value);
-        }
-    }
+	_next(value) {
+		let result;
+		try {
+			result = this.predicate(value, this.count++);
+		} catch (err) {
+			this.destination.error(err);
+			return;
+		}
+		if (result) {
+			this.destination.next(value);
+		}
+	}
 }
 
 export function filter(predicate) {
@@ -129,40 +149,40 @@ export function filter(predicate) {
 }
 
 class TapSubscriber extends Subscriber {
-    constructor(destination, nextOrObserver, error, complete) {
-        super(destination);
-        const safeSubscriber = new Subscriber(nextOrObserver, error, complete);
-        safeSubscriber.syncErrorThrowable = true;
-        this.add(safeSubscriber);
-        this.safeSubscriber = safeSubscriber;
-    }
+	constructor(destination, nextOrObserver, error, complete) {
+		super(destination);
+		const safeSubscriber = new Subscriber(nextOrObserver, error, complete);
+		safeSubscriber.syncErrorThrowable = true;
+		this.add(safeSubscriber);
+		this.safeSubscriber = safeSubscriber;
+	}
 
-    _next(value) {
-        this.safeSubscriber.next(value);
-        if (this.safeSubscriber.syncErrorThrown) {
-            this.destination.error(this.safeSubscriber.syncErrorValue);
-        } else {
-            this.destination.next(value);
-        }
-    }
+	_next(value) {
+		this.safeSubscriber.next(value);
+		if (this.safeSubscriber.syncErrorThrown) {
+			this.destination.error(this.safeSubscriber.syncErrorValue);
+		} else {
+			this.destination.next(value);
+		}
+	}
 
-    _error(err) {
-        this.safeSubscriber.error(err);
-        if (this.safeSubscriber.syncErrorThrown) {
-            this.destination.error(this.safeSubscriber.syncErrorValue);
-        } else {
-            this.destination.error(err);
-        }
-    }
+	_error(err) {
+		this.safeSubscriber.error(err);
+		if (this.safeSubscriber.syncErrorThrown) {
+			this.destination.error(this.safeSubscriber.syncErrorValue);
+		} else {
+			this.destination.error(err);
+		}
+	}
 
-    _complete() {
-        this.safeSubscriber.complete();
-        if (this.safeSubscriber.syncErrorThrown) {
-            this.destination.error(this.safeSubscriber.syncErrorValue);
-        } else {
-            this.destination.complete();
-        }
-    }
+	_complete() {
+		this.safeSubscriber.complete();
+		if (this.safeSubscriber.syncErrorThrown) {
+			this.destination.error(this.safeSubscriber.syncErrorValue);
+		} else {
+			this.destination.complete();
+		}
+	}
 }
 
 export function tap(nextOrObserver, error, complete) {
@@ -174,25 +194,25 @@ export function tap(nextOrObserver, error, complete) {
 }
 
 class CatchErrorOuterSubscriber extends OuterSubscriber {
-    constructor(destination, selector, caught) {
-        super(destination);
-        this.selector = selector;
-        this.caught = caught;
-    }
+	constructor(destination, selector, caught) {
+		super(destination);
+		this.selector = selector;
+		this.caught = caught;
+	}
 
-    error(err) {
-        if (!this.stopped) {
-            let result;
-            try {
-                result = this.selector(err, this.caught);
-            } catch (innerError) {
-                super.error(innerError);
-                return;
-            }
-            this.unsubscribeAndRecycle();
-            this.add(subscribeToResult(this, result));
-        }
-    }
+	error(err) {
+		if (!this.stopped) {
+			let result;
+			try {
+				result = this.selector(err, this.caught);
+			} catch (innerError) {
+				super.error(innerError);
+				return;
+			}
+			this.unsubscribeAndRecycle();
+			this.add(subscribeToResult(this, result));
+		}
+	}
 }
 
 export function catchError(selector) {
@@ -205,52 +225,52 @@ export function catchError(selector) {
 }
 
 class TakeSubscriber extends Subscriber {
-    constructor(destination, total) {
-        super(destination);
-        this.total = total;
-        this.count = 0;
-    }
+	constructor(destination, total) {
+		super(destination);
+		this.total = total;
+		this.count = 0;
+	}
 
-    _next(value) {
-        this.count += 1;
-        if (this.count <= this.total) {
-            this.destination.next(value);
-            if (this.count === this.total) {
-                this.destination.complete();
-                this.unsubscribe();
-            }
-        }
-    }
+	_next(value) {
+		this.count += 1;
+		if (this.count <= this.total) {
+			this.destination.next(value);
+			if (this.count === this.total) {
+				this.destination.complete();
+				this.unsubscribe();
+			}
+		}
+	}
 }
 
 export function take(count) {
 	return (source) => {
 		if (count === 0) {
-            return new EmptyObservable();
-        } else {
-            return source.lift((subscriber) => {
-		        if (count < 0) {
-		            throw new Error('Take "count" parameter must be less or greater than zero (0).');
-		        }
-		        return source.subscribe(new TakeSubscriber(subscriber, count))
-            });
-        }
+			return new EmptyObservable();
+		} else {
+			return source.lift((subscriber) => {
+				if (count < 0) {
+					throw new Error('Take "count" parameter must be less or greater than zero (0).');
+				}
+				return source.subscribe(new TakeSubscriber(subscriber, count));
+			});
+		}
 	};
 }
 
 class SkipSubscriber extends Subscriber {
-    constructor(destination, total) {
-        super(destination);
-        this.total = total;
-        this.count = 0;
-    }
+	constructor(destination, total) {
+		super(destination);
+		this.total = total;
+		this.count = 0;
+	}
 
-    _next(value) {
-    	this.count += 1;
-        if (this.count > this.total) {
-            this.destination.next(value);
-        }
-    }
+	_next(value) {
+		this.count += 1;
+		if (this.count > this.total) {
+			this.destination.next(value);
+		}
+	}
 }
 
 export function skip(count) {
@@ -510,6 +530,70 @@ export function withLatestFrom(...args) {
 	};
 }
 
+class SwitchFirstMapSubscriber extends OuterSubscriber {
+	constructor(destination, project, resultSelector) {
+		super(destination);
+		this.project = project;
+		this.resultSelector = resultSelector;
+		this.hasSubscription = false;
+		this.hasCompleted = false;
+		this.index = 0;
+	}
+
+	_next(value) {
+		if (!this.hasSubscription) {
+			this.tryNext(value);
+		}
+	}
+
+	tryNext(value) {
+		try {
+			const result = this.project(value, this.index);
+			this.hasSubscription = true;
+			this.add(subscribeToResult(this, result, value, this.index));
+		} catch (err) {
+			this.destination.error(err);
+		}
+		this.index += 1;
+	}
+
+	_complete() {
+		this.hasCompleted = true;
+		if (!this.hasSubscription) {
+			this.destination.complete();
+		}
+	}
+
+	notifyNext(outerValue, innerValue, outerIndex, innerIndex, innerSub) {
+		if (this.resultSelector) {
+			this.trySelectResult(outerValue, innerValue, outerIndex, innerIndex);
+		} else {
+			this.destination.next(innerValue);
+		}
+	}
+
+	trySelectResult(outerValue, innerValue, outerIndex, innerIndex) {
+		try {
+			const result = this.resultSelector(outerValue, innerValue, outerIndex, innerIndex);
+			this.destination.next(result);
+		} catch (err) {
+			this.destination.error(err);
+		}
+	}
+
+	notifyError(err) {
+		this.destination.error(err);
+	}
+
+	notifyComplete(innerSub) {
+		this.remove(innerSub);
+		this.hasSubscription = false;
+		if (this.hasCompleted) {
+			this.destination.complete();
+		}
+	}
+}
+
 export function exhaustMap(project, resultSelector) {
 	return (source) => {
 		return source.lift((subscriber) => {
@@ -518,65 +602,46 @@ export function exhaustMap(project, resultSelector) {
 	};
 }
 
-class SwitchFirstMapSubscriber extends OuterSubscriber {
-    constructor(destination, project, resultSelector) {
-        super(destination);
-        this.project = project;
-        this.resultSelector = resultSelector;
-        this.hasSubscription = false;
-        this.hasCompleted = false;
-        this.index = 0;
-    }
-    _next(value) {
-        if (!this.hasSubscription) {
-            this.tryNext(value);
-        }
-    }
+class HandlePromiseSubscriber extends Subscriber {
+	constructor(destination, thenHandler, catchHandler) {
+		super(destination);
+		this.thenHandler = thenHandler;
+		this.catchHandler = catchHandler;
+		this.count = 0;
+	}
 
-    tryNext(value) {
-        try {
-            const result = this.project(value, this.index);
-            this.hasSubscription = true;
-            this.add(subscribeToResult(this, result, value, this.index));
-        } catch (err) {
-            this.destination.error(err);
-        }
-        this.index += 1;
-    }
+	_next(promise) {
+		let afterThen;
+		try {
+			if (!!this.thenHandler) {
+				promise.then((...args) => {
+					this.destination.next(this.thenHandler(...args));
+				});
+			} else {
+				promise.then((...args) => {
+					this.destination.next(...args);
+				});
+			}
 
-    _complete() {
-        this.hasCompleted = true;
-        if (!this.hasSubscription) {
-            this.destination.complete();
-        }
-    }
+			if (!!this.catchHandler) {
+				promise.catch((err) => {
+					this.destination.next(this.catchHandler(err));
+				});
+			} else {
+				promise.catch((err) => {
+					this.destination.error(err);
+				});
+			}
+		} catch (err) {
+			this.destination.error(err);
+		}
+	}
+}
 
-    notifyNext(outerValue, innerValue, outerIndex, innerIndex, innerSub) {
-        if (this.resultSelector) {
-            this.trySelectResult(outerValue, innerValue, outerIndex, innerIndex);
-        } else {
-            this.destination.next(innerValue);
-        }
-    }
-
-    trySelectResult(outerValue, innerValue, outerIndex, innerIndex) {
-        try {
-            const result = this.resultSelector(outerValue, innerValue, outerIndex, innerIndex);
-            this.destination.next(result);
-        } catch (err) {
-            this.destination.error(err);
-        }
-    }
-
-    notifyError(err) {
-        this.destination.error(err);
-    }
-
-    notifyComplete(innerSub) {
-        this.remove(innerSub);
-        this.hasSubscription = false;
-        if (this.hasCompleted) {
-            this.destination.complete();
-        }
-    }
+export function handlePromise(thenHandler, catchHandler) {
+	return (source) => {
+		return source.lift((subscriber) => {
+			return source.subscribe(new HandlePromiseSubscriber(subscriber, thenHandler, catchHandler));
+		});
+	};
 }

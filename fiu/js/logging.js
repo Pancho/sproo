@@ -1,76 +1,186 @@
-export class Logging {
-	originalConsole;
+/**
+ * Logging levels
+ *
+ */
+export class LogStrict {
 
-	constructor() {
-		// We must override and then replace the console here
-		this.originalConsole = window.console;
-	}
+	/**
+	 * Log all, raise an error if mismatch amount of arguments
+	 */
+	static LOG_RAISE_ERROR = 1;
 
-	log() {}
-	debug() {}
+	/**
+	 * Log all, print a warning when mismatch amount of arguments
+	 */
+	static LOG_WITH_WARNINGS = 2;
+
+	/**
+	 * Log all
+	 */
+	static TRACE = 3;
+
+	/**
+	 * Hide: trace
+	 * Print: debug, info, warn, error
+	 */
+	static DEBUG = 4;
+	/**
+	 * Print: info, warn, error
+	 * Hide: trace, debug
+	 */
+	static LOG = 5;
+	/**
+	 * Print: warn, error
+	 * Hide: trace, debug, info
+	 */
+	static WARN = 6;
+	/**
+	 * Print: error
+	 * Hide: trace, debug, info, warn
+	 */
+	static ERROR = 7;
+	/**
+	 * Completely disable all loggin functions
+	 */
+	static DISABLE_LOGS = 8;
 }
 
+/**
+ * Factory class for {@see Logger}
+ */
+export class LoggerFactory {
+	/**
+	 * Current logging level
+	 */
+	logLevel = LogStrict.LOG_WITH_WARNINGS;
+	worker;
 
-const _log = (function (undefined) {
-	var Log = Error; // does this do anything?  proper inheritance...?
-	Log.prototype.write = function (args) {
-		/// <summary>
-		/// Paulirish-like console.log wrapper.  Includes stack trace via @fredrik SO suggestion (see remarks for sources).
-		/// </summary>
-		/// <param name="args" type="Array">list of details to log, as provided by `arguments`</param>
-		/// <remarks>Includes line numbers by calling Error object -- see
-		/// * http://paulirish.com/2009/log-a-lightweight-wrapper-for-consolelog/
-		/// * https://stackoverflow.com/questions/13815640/a-proper-wrapper-for-console-log-with-correct-line-number
-		/// * https://stackoverflow.com/a/3806596/1037948
-		/// </remarks>
+	constructor() {
+	}
 
-		// via @fredrik SO trace suggestion; wrapping in special construct so it stands out
-		var suffix = {
-			'@': (this.lineNumber
-					? this.fileName + ':' + this.lineNumber + ':1' // add arbitrary column value for chrome linking
-					: extractLineNumberFromStack(this.stack)
-			),
+	noop() {
+	}
+
+	/**
+	 * @return Single log function that can be called, e.g. getSingleLogger(...)('hello world')
+	 * @param initiator - badge string, that every log will be marked with
+	 * @param style - css style, e.g. `font-size: 10px; border-color: red`
+	 * @param fn - bound function that will be called eventually, e.g. console.log
+	 * @param minLevel - initial logging level, .e.g 2
+	 */
+	getSingleLogger(initiator, style, fn, minLevel = LogStrict.LOG_WITH_WARNINGS) {
+		return (...outerArgs) => {
+			if (this.logLevel > minLevel) {
+				return this.noop;
+			}
+			const args = Array.prototype.slice.call(outerArgs);
+			const parts = args.shift().split('{}');
+			const partsLength = parts.length;
+			let i = 0;
+			const params = [console, '%c' + initiator, style];
+
+			for (; i < partsLength; i += 1) {
+				params.push(parts[i]);
+				if (typeof args[i] !== 'undefined') {  // args can be '0'
+					params.push(args[i]);
+				}
+			}
+			if (parts.length - 1 !== args.length) {
+				if (this.logLevel === LogStrict.LOG_WITH_WARNINGS) {
+					console.error('Mismatch amount of arguments');
+				} else if (this.logLevel === LogStrict.LOG_RAISE_ERROR) {
+					throw new Error('Mismatch amount of arguments');
+				}
+			}
+			if (this.worker) {
+				this.worker.postMessage({
+					source: initiator,
+					arguments: JSON.stringify(outerArgs),
+					level: fn.name,
+					endpoint: this.endpoint,
+				})
+			}
+			return Function.prototype.bind.apply(fn, params);
 		};
+	}
 
-		args = args.concat([suffix]);
-		// via @paulirish console wrapper
-		if (console && console.log) {
-			if (console.log.apply) {
-				console.log.apply(console, args);
-			} else {
-				console.log(args);
-			} // nicer display in some browsers
+	/**
+	 * @return a logger object
+	 * @param clazz - class for which this logger will be created;
+	 */
+	getLogger(clazz) {
+		const style = LoggerFactory.getColorStyle(LoggerFactory.classToColor(clazz));
+		return {
+			trace: this.getSingleLogger(
+				clazz.name, style, console.trace, LogStrict.TRACE),
+			debug: this.getSingleLogger(
+				clazz.name, style, console.debug, LogStrict.DEBUG),
+			log: this.getSingleLogger(
+				clazz.name, style, console.log, LogStrict.LOG),
+			warn: this.getSingleLogger(
+				clazz.name, style, console.warn, LogStrict.WARN),
+			error: this.getSingleLogger(
+				clazz.name, style, console.error, LogStrict.ERROR),
+		};
+	}
+
+	setEndpoint(endpoint) {
+		if (!endpoint) {
+			return;
 		}
-	};
-	var extractLineNumberFromStack = function (stack) {
-		/// <summary>
-		/// Get the line/filename detail from a Webkit stack trace.  See https://stackoverflow.com/a/3806596/1037948
-		/// </summary>
-		/// <param name="stack" type="String">the stack string</param>
 
-		if (!stack) return '?'; // fix undefined issue reported by @sigod
+		this.endpoint = endpoint;
+		this.worker = LoggerFactory.createWorker((message) => {
+			const formData = new FormData();
 
-		// correct line number according to how Log().write implemented
-		var line = stack.split('\n')[2];
-		// fix for various display text
-		line = (line.indexOf(' (') >= 0
-				? line.split(' (')[1].substring(0, line.length - 1)
-				: line.split('at ')[1]
-		);
-		return line;
-	};
+			formData.append('source', message.data.source);
+			formData.append('arguments', message.data.arguments);
+			formData.append('level', message.data.level);
+			const headers = {
+				'Accept': 'application/json, text/plain, */*',
+				'X-Requested-With': 'XMLHttpRequest',
+			}, options = {
+				method: 'POST',
+				headers: headers,
+				body: formData,
+			};
 
-	return function (params) {
-		/// <summary>
-		/// Paulirish-like console.log wrapper
-		/// </summary>
-		/// <param name="params" type="[...]">list your logging parameters</param>
+			return fetch(message.data.endpoint, options);
+		});
+	}
 
-		// only if explicitly true somewhere
-		if (typeof DEBUGMODE === typeof undefined || !DEBUGMODE) return;
+	setLogLevel(logLevel) {
+		if (LogStrict.LOG_RAISE_ERROR > logLevel || logLevel > LogStrict.DISABLE_LOGS) {
+			throw Error(`Invalid log level ${logLevel} allowed:  ${JSON.stringify(LogStrict)}`);
+		}
+		this.logLevel = logLevel;
+	}
 
-		// call handler extension which provides stack trace
-		Log().write(Array.prototype.slice.call(arguments, 0)); // turn into proper array
-	};//--  fn  returned
+	/**
+	 * @return css for badge
+	 * @param color - css color, e.g. #FFFAAA
+	 */
+	static getColorStyle(color) {
+		return `color: white; background-color: ${
+			color}; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
+	}
 
-})();//--- _log
+	static classToColor(clazz) {
+		let hash = 0;
+		let i = 0;
+		const len = clazz.name.length;
+		for (; i < len; i += 1) {
+			hash = clazz.name.charCodeAt(i) + ((hash << 5) - hash);
+		}
+
+		const color = (hash & 0x00FFFFFF)
+			.toString(16)
+			.toUpperCase();
+
+		return '#00000'.substring(1, 6 - color.length) + color;
+	}
+
+	static createWorker(fn) {
+		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${fn}`])));
+	}
+}

@@ -1,6 +1,7 @@
 import { Authentication } from './authentication.js';
 import { Component } from './component.js';
 import { Http } from './http.js';
+import { LoggerFactory } from './logging.js';
 import { Router } from './router.js';
 import { Utils } from './utils.js';
 
@@ -8,6 +9,7 @@ export class App {
 	static instance;
 	static appReady;
 	static injectionRegistry = {};
+	static loggerFactory = new LoggerFactory();
 	router = null;
 	http = null;
 
@@ -23,6 +25,7 @@ export class App {
 		authenticationUrl,
 		httpEndpointStub,
 		providers,
+		loggerConfig,
 		onAppReady,
 	) {
 		let authentication;
@@ -37,6 +40,18 @@ export class App {
 
 		if (!!providers) {
 			providers.forEach(provider => App.provide(...provider));
+		}
+
+		if (!!loggerConfig) {
+			if (!!loggerConfig.endpoint) {
+				App.loggerFactory.setEndpoint(loggerConfig.endpoint);
+			}
+			if (!!loggerConfig.level) {
+				App.loggerFactory.setLogLevel(loggerConfig.level);
+			}
+		} else {
+			// Since it's expected that it's not referenced by anything else, we can expect GC will dispose of it.
+			App.loggerFactory = null;
 		}
 
 		App.instance = this;
