@@ -98,7 +98,7 @@ export class LoggerFactory {
 					arguments: JSON.stringify(outerArgs),
 					level: fn.name,
 					endpoint: this.endpoint,
-				})
+				});
 			}
 			return Function.prototype.bind.apply(fn, params);
 		};
@@ -124,7 +124,7 @@ export class LoggerFactory {
 		};
 	}
 
-	setEndpoint(endpoint) {
+	setEndpoint(endpoint, handler) {
 		if (!endpoint) {
 			return;
 		}

@@ -14,7 +14,7 @@ export class App {
 	http = null;
 
 	constructor(
-		config
+		config,
 	) {
 		let authentication;
 
@@ -31,8 +31,8 @@ export class App {
 		}
 
 		if (!!config.loggerConfig) {
-			if (!!config.loggerConfig.endpoint) {
-				App.loggerFactory.setEndpoint(config.loggerConfig.endpoint);
+			if (!!config.loggerConfig.endpoint && !!config.loggerConfig.handler) {
+				App.loggerFactory.setEndpoint(config.loggerConfig.endpoint, config.loggerConfig.handler);
 			}
 			if (!!config.loggerConfig.level) {
 				App.loggerFactory.setLogLevel(config.loggerConfig.level);
@@ -60,7 +60,7 @@ export class App {
 					config.notFound,
 					config.routes,
 					config.defaultPageName,
-					config.authenticationUrl
+					config.authenticationUrl,
 				);
 
 				if (!!config.authenticationClass) {
