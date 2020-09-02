@@ -14,19 +14,7 @@ export class App {
 	http = null;
 
 	constructor(
-		routeRoot,
-		homePage,
-		notFound,
-		routes,
-		defaultPageName,
-		defaultComponents,
-		defaultStylesheets,
-		authenticationClass,
-		authenticationUrl,
-		httpEndpointStub,
-		providers,
-		loggerConfig,
-		onAppReady,
+		config
 	) {
 		let authentication;
 
@@ -34,20 +22,20 @@ export class App {
 			throw new Error('Only one instance of App allowed');
 		}
 
-		if (!!defaultStylesheets) {
-			Utils.applyCss(defaultStylesheets, document);
+		if (!!config.defaultStylesheets) {
+			Utils.applyCss(config.defaultStylesheets, document);
 		}
 
-		if (!!providers) {
-			providers.forEach(provider => App.provide(...provider));
+		if (!!config.providers) {
+			config.providers.forEach(provider => App.provide(...provider));
 		}
 
-		if (!!loggerConfig) {
-			if (!!loggerConfig.endpoint) {
-				App.loggerFactory.setEndpoint(loggerConfig.endpoint);
+		if (!!config.loggerConfig) {
+			if (!!config.loggerConfig.endpoint) {
+				App.loggerFactory.setEndpoint(config.loggerConfig.endpoint);
 			}
-			if (!!loggerConfig.level) {
-				App.loggerFactory.setLogLevel(loggerConfig.level);
+			if (!!config.loggerConfig.level) {
+				App.loggerFactory.setLogLevel(config.loggerConfig.level);
 			}
 		} else {
 			// Since it's expected that it's not referenced by anything else, we can expect GC will dispose of it.
@@ -59,24 +47,31 @@ export class App {
 			// We must delay the initialization of the root components and router, so that the Component classes have time to subscribe to
 			// router's link handling, even if just by pushing everything to the end of the stack
 			setTimeout(() => {
-				if (!!defaultComponents) {
-					defaultComponents.forEach((component) => {
+				if (!!config.defaultComponents) {
+					config.defaultComponents.forEach((component) => {
 						Component.attachObservedAttributes(component);
 						customElements.define(component.tagName, component);
 					});
 				}
 
-				this.router = new Router(routeRoot, homePage, notFound, routes, defaultPageName, authenticationUrl);
+				this.router = new Router(
+					config.routeRoot,
+					config.homePage,
+					config.notFound,
+					config.routes,
+					config.defaultPageName,
+					config.authenticationUrl
+				);
 
-				if (!!authenticationClass) {
-					authentication = new authenticationClass();
+				if (!!config.authenticationClass) {
+					authentication = new config.authenticationClass();
 				} else {
 					authentication = new Authentication();
 				}
 
-				this.http = new Http(httpEndpointStub, authentication);
+				this.http = new Http(config.httpEndpointStub, authentication);
 
-				onAppReady.forEach(fn => fn());
+				config.onAppReady.forEach(fn => fn());
 
 				resolve();
 			});

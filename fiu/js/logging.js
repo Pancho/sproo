@@ -2,7 +2,7 @@
  * Logging levels
  *
  */
-export class LogStrict {
+export class LogLevels {
 
 	/**
 	 * Log all, raise an error if mismatch amount of arguments
@@ -52,7 +52,7 @@ export class LoggerFactory {
 	/**
 	 * Current logging level
 	 */
-	logLevel = LogStrict.LOG_WITH_WARNINGS;
+	logLevel = LogLevels.LOG_WITH_WARNINGS;
 	worker;
 
 	constructor() {
@@ -68,7 +68,7 @@ export class LoggerFactory {
 	 * @param fn - bound function that will be called eventually, e.g. console.log
 	 * @param minLevel - initial logging level, .e.g 2
 	 */
-	getSingleLogger(initiator, style, fn, minLevel = LogStrict.LOG_WITH_WARNINGS) {
+	getSingleLogger(initiator, style, fn, minLevel = LogLevels.LOG_WITH_WARNINGS) {
 		return (...outerArgs) => {
 			if (this.logLevel > minLevel) {
 				return this.noop;
@@ -86,9 +86,9 @@ export class LoggerFactory {
 				}
 			}
 			if (parts.length - 1 !== args.length) {
-				if (this.logLevel === LogStrict.LOG_WITH_WARNINGS) {
+				if (this.logLevel === LogLevels.LOG_WITH_WARNINGS) {
 					console.error('Mismatch amount of arguments');
-				} else if (this.logLevel === LogStrict.LOG_RAISE_ERROR) {
+				} else if (this.logLevel === LogLevels.LOG_RAISE_ERROR) {
 					throw new Error('Mismatch amount of arguments');
 				}
 			}
@@ -112,15 +112,15 @@ export class LoggerFactory {
 		const style = LoggerFactory.getColorStyle(LoggerFactory.classToColor(clazz));
 		return {
 			trace: this.getSingleLogger(
-				clazz.name, style, console.trace, LogStrict.TRACE),
+				clazz.name, style, console.trace, LogLevels.TRACE),
 			debug: this.getSingleLogger(
-				clazz.name, style, console.debug, LogStrict.DEBUG),
+				clazz.name, style, console.debug, LogLevels.DEBUG),
 			log: this.getSingleLogger(
-				clazz.name, style, console.log, LogStrict.LOG),
+				clazz.name, style, console.log, LogLevels.LOG),
 			warn: this.getSingleLogger(
-				clazz.name, style, console.warn, LogStrict.WARN),
+				clazz.name, style, console.warn, LogLevels.WARN),
 			error: this.getSingleLogger(
-				clazz.name, style, console.error, LogStrict.ERROR),
+				clazz.name, style, console.error, LogLevels.ERROR),
 		};
 	}
 
@@ -150,8 +150,8 @@ export class LoggerFactory {
 	}
 
 	setLogLevel(logLevel) {
-		if (LogStrict.LOG_RAISE_ERROR > logLevel || logLevel > LogStrict.DISABLE_LOGS) {
-			throw Error(`Invalid log level ${logLevel} allowed:  ${JSON.stringify(LogStrict)}`);
+		if (LogLevels.LOG_RAISE_ERROR > logLevel || logLevel > LogLevels.DISABLE_LOGS) {
+			throw Error(`Invalid log level ${logLevel} allowed:  ${JSON.stringify(LogLevels)}`);
 		}
 		this.logLevel = logLevel;
 	}
