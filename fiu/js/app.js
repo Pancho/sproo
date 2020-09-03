@@ -22,8 +22,8 @@ export class App {
 			throw new Error('Only one instance of App allowed');
 		}
 
-		if (!!config.defaultStylesheets) {
-			Utils.applyCss(config.defaultStylesheets, document);
+		if (!!config.rootStylesheets) {
+			Utils.applyCss(config.rootStylesheets, document);
 		}
 
 		if (!!config.providers) {
@@ -47,8 +47,8 @@ export class App {
 			// We must delay the initialization of the root components and router, so that the Component classes have time to subscribe to
 			// router's link handling, even if just by pushing everything to the end of the stack
 			setTimeout(() => {
-				if (!!config.defaultComponents) {
-					config.defaultComponents.forEach((component) => {
+				if (!!config.rootComponents) {
+					config.rootComponents.forEach((component) => {
 						Component.attachObservedAttributes(component);
 						customElements.define(component.tagName, component);
 					});
