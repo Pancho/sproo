@@ -64,7 +64,7 @@
 * path: '/main/:param1/something/:param2/also-something'
 *
 * With such url, your component will receive two parameters, called param1 and param2, both of which will be strings, so you will have to
-* parse and cast to desired types. Why not do some casting automatically? We could, but that would trully make this a package worthy of its
+* parse and cast to desired types. Why not do some casting automatically? We could, but that would truly make this a package worthy of its
 * own name, and this is not our goal. Mostly you pass params that are meant to be either strings or numbers, so no casting should pose any
 * problems.
 *
@@ -74,9 +74,9 @@
 * convention for naming your parameters (you're writing JS not Python)
 *
 * While hooks are optional and pretty simple to understand, I need to stress that component must extend Component class (from
-* sablono/fiu/component.js) and follow the convention or unexpected things may happen. It might be so that this could work without that
-* class in between, but I did not spend a second trying that scenario out, and most likely will not.
-* Do not try to make a path like '' or '/', because those (ot that) are a special case called homePage and are reserved for that.
+* ./fiu/component.js) and follow the convention or unexpected things may happen. It might be so that this could work without that
+* class in between, but I did not spend a single second trying that scenario out, and most likely will not.
+* Do not try to make a path like '' or '/', because those (or that) are a special case called homePage and are reserved for that.
 */
 export class Router {
 	routeRoot = null;
@@ -96,7 +96,7 @@ export class Router {
 		this.routeRoot = routeRoot;
 		this.authenticationUrl = authenticationUrl;
 
-		window.addEventListener('popstate', this.resolve);
+		window.addEventListener('popstate', () => this.resolve());
 		this.updatePageLinks();
 
 		this.homePageRoute = {
@@ -140,7 +140,6 @@ export class Router {
 					},
 					...route.hooks,
 				},
-				route.name,
 			);
 		});
 		this.resolve();
@@ -155,7 +154,7 @@ export class Router {
 		window.removeEventListener('popstate', this.resolve);
 	}
 
-	add(route, handler = null, hooks = null, name = null) {
+	add(route, handler = null, hooks = null) {
 		if (typeof route === 'string') {
 			route = encodeURI(route);
 		}
@@ -163,7 +162,6 @@ export class Router {
 			path: route,
 			handler: handler,
 			hooks: hooks,
-			name: name,
 		});
 
 		return this.add;
@@ -184,8 +182,7 @@ export class Router {
 						return false;  // Could do preventDefault, but would return either way, so this is actually perfectly fine
 					}
 
-					const location = target.getAttribute('route'),
-						name = target.getAttribute('name');
+					const location = target.getAttribute('route');
 
 					if (!this.destroyed) {
 						event.preventDefault();
@@ -194,7 +191,6 @@ export class Router {
 								.replace(RouterUtils.CLEAN_TRAILING_SLASH, '')
 								.replace(RouterUtils.CLEAN_LEADING_SLASH, '/'),
 							{...target.dataset},  // "cast" to dict
-							name,
 						);
 					}
 					break;
@@ -203,7 +199,7 @@ export class Router {
 		});
 	}
 
-	navigate(location, data, name) {
+	navigate(location, data) {
 		data = data || {};
 		location = location || '';
 		window.history.pushState(
@@ -246,7 +242,7 @@ export class Router {
 		const url = current || RouterUtils.clean(window.location.href),
 			path = RouterUtils.splitURL(url.replace(this.routeRoot, ''));
 
-		if (this.lastRouteResolved.path === path) {
+		if (!!this.lastRouteResolved && this.lastRouteResolved.path === path) {
 			if (!!this.lastRouteResolved.hooks && !!this.lastRouteResolved.hooks.already) {
 				this.lastRouteResolved.hooks.already(this.lastRouteResolved.params);
 			}
@@ -261,7 +257,6 @@ export class Router {
 				path: path,
 				hooks: match.route.hooks,
 				params: match.params,
-				name: match.route.name,
 			};
 
 			const handler = match.route.handler;
