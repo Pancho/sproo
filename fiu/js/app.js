@@ -59,7 +59,6 @@ export class App {
 					config.homePage,
 					config.notFound,
 					config.routes,
-					config.defaultPageName,
 					config.authenticationUrl,
 				);
 

@@ -36,13 +36,6 @@
 * not found are special cases and most frameworks agree, so I separated them. Navigo separates not found too, but I wanted to have all of
 * the special cases handled in a similar way, not a mix of both worlds.
 *
-* ---defaultPageName---
-* I'm skipping routes at this point, as they need far more explanation and am resorting to the defaultPageName now. This is the window.name
-* parameter. window.name is the thing you usually put into the "target" attribute (remember: target="_blank", but it can also be
-* target="Admin page"). To change this, just provide "name" attribute to an element with the "route" attribute and when one navigates via
-* that attribute, window.name will also change. This is totally optional, and should be set to null or some other falsy value if you want
-* it omitted.
-*
 * ---routes---
 * This is the meat of this class even though we already touched this with homePage and notFound. In essence, it's a list of blobs, but these
 * blobs must have a certain structure for router to work (duh), so let's start with a full example and we'll dissect it like a frog in a
@@ -92,9 +85,8 @@ export class Router {
 	homePageRoute = null;
 	notFoundRoute = null;
 	destroyed = false;
-	defaultPageName = '';
 
-	constructor(routeRoot, homePage, notFound, routes, defaultPageName, authenticationUrl) {
+	constructor(routeRoot, homePage, notFound, routes, authenticationUrl) {
 		if (!!Router.instance) {
 			throw new Error('Only one instance of Router allowed');
 		}
@@ -102,7 +94,6 @@ export class Router {
 		Router.instance = this;
 
 		this.routeRoot = routeRoot;
-		this.defaultPageName = defaultPageName;
 		this.authenticationUrl = authenticationUrl;
 
 		window.addEventListener('popstate', this.resolve);
@@ -213,12 +204,15 @@ export class Router {
 	}
 
 	navigate(location, data, name) {
-		name = name || this.defaultPageName;
 		data = data || {};
 		location = location || '';
 		window.history.pushState(
 			data,
-			name,
+			// Here's the thing about this param... this would replace the title tag, so each page could have a unique
+			// title, but of all the browsers, only Safari uses this, and I don't want to test it, to see if this is
+			// even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
+			// for the SEO anyway.
+			'',
 			(this.routeRoot + '/' + location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')).replace(/([^:])(\/{2,})/g, '$1/'),
 		);
 		this.resolve();
