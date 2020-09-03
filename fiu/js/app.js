@@ -31,8 +31,8 @@ export class App {
 		}
 
 		if (!!config.loggerConfig) {
-			if (!!config.loggerConfig.endpoint && !!config.loggerConfig.handler) {
-				App.loggerFactory.setEndpoint(config.loggerConfig.endpoint, config.loggerConfig.handler);
+			if (!!config.loggerConfig.handler) {
+				App.loggerFactory.setEndpoint(config.loggerConfig.handler);
 			}
 			if (!!config.loggerConfig.level) {
 				App.loggerFactory.setLogLevel(config.loggerConfig.level);

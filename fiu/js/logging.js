@@ -97,7 +97,6 @@ export class LoggerFactory {
 					source: initiator,
 					arguments: JSON.stringify(outerArgs),
 					level: fn.name,
-					endpoint: this.endpoint,
 				});
 			}
 			return Function.prototype.bind.apply(fn, params);
@@ -124,29 +123,12 @@ export class LoggerFactory {
 		};
 	}
 
-	setEndpoint(endpoint, handler) {
-		if (!endpoint) {
+	setEndpoint(handler) {
+		if (!handler) {
 			return;
 		}
 
-		this.endpoint = endpoint;
-		this.worker = LoggerFactory.createWorker((message) => {
-			const formData = new FormData();
-
-			formData.append('source', message.data.source);
-			formData.append('arguments', message.data.arguments);
-			formData.append('level', message.data.level);
-			const headers = {
-				'Accept': 'application/json, text/plain, */*',
-				'X-Requested-With': 'XMLHttpRequest',
-			}, options = {
-				method: 'POST',
-				headers: headers,
-				body: formData,
-			};
-
-			return fetch(message.data.endpoint, options);
-		});
+		this.worker = LoggerFactory.createWorker(handler);
 	}
 
 	setLogLevel(logLevel) {
