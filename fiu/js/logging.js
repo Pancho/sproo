@@ -73,25 +73,7 @@ export class LoggerFactory {
 			if (this.logLevel > minLevel) {
 				return this.noop;
 			}
-			const args = Array.prototype.slice.call(outerArgs);
-			const parts = args.shift().split('{}');
-			const partsLength = parts.length;
-			let i = 0;
-			const params = [console, '%c' + initiator, style];
-
-			for (; i < partsLength; i += 1) {
-				params.push(parts[i]);
-				if (typeof args[i] !== 'undefined') {  // args can be '0'
-					params.push(args[i]);
-				}
-			}
-			if (parts.length - 1 !== args.length) {
-				if (this.logLevel === LogLevels.LOG_WITH_WARNINGS) {
-					console.error('Mismatch amount of arguments');
-				} else if (this.logLevel === LogLevels.LOG_RAISE_ERROR) {
-					throw new Error('Mismatch amount of arguments');
-				}
-			}
+			const params = [console, '%c' + initiator, style, ...outerArgs];
 			if (this.worker) {
 				this.worker.postMessage({
 					source: initiator,

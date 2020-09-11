@@ -49,7 +49,6 @@ export class App {
 			setTimeout(() => {
 				if (!!config.rootComponents) {
 					config.rootComponents.forEach((component) => {
-						Component.attachObservedAttributes(component);
 						customElements.define(component.tagName, component);
 					});
 				}
@@ -95,7 +94,6 @@ export class App {
 			});
 		}
 	}
-
 
 	static inject(clazz) {
 		let result = {};

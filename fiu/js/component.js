@@ -168,6 +168,9 @@ export class Component extends HTMLElement {
 	constructor(clazz) {
 		super();
 
+		// Template context, from which the template gets updated
+		this.templateContext = {};
+
 		if (!clazz) {
 			throw Error('Please provide the class for the component constructor, as such: super(MySuperYetSimpleAndCertainlyNotHackedComponent);');
 		}
@@ -184,14 +187,14 @@ export class Component extends HTMLElement {
 		Object.keys(injections).forEach((propertyName) => {
 			this[propertyName] = injections[propertyName];
 		});
-		this.logger = App.loggerFactory.getLogger(clazz);
+		if (!!App.loggerFactory) {
+			this.logger = App.loggerFactory.getLogger(clazz);
+		}
+
 
 		if (!!clazz.registerComponents) {
 			clazz.registerComponents.forEach((component) => {
 				if (Component.registeredComponents.indexOf(component) === -1) {  // Should not load twice, right
-					if (!component.manualAttributeHandling) {
-						Component.attachObservedAttributes(component);
-					}
 					customElements.define(component.tagName, component);
 					Component.registeredComponents.push(component);
 				}
@@ -215,20 +218,86 @@ export class Component extends HTMLElement {
 		]).then(() => {
 			this.app = App.instance;
 			this.app.router.updatePageLinks(this.shadowRoot);
-			// We'll just populate the extending's component's fields with elements found under selectors specified
-			// This is here, because ES5 does not have decorators... should time arrive when vanilla JS supports decorators, this is the
-			// first thing that goes
-			// TODO: ES5 quirk
-			Object.entries(this.populateFields()).forEach((entry, index) => {
-				const field = entry[0],
-					selector = entry[1];
-				if (selector.startsWith('|all|')) {
-					this[field] = this.getElements(selector.replace('|all|', ''));
-				} else {
-					this[field] = this.getElement(selector);
-				}
-			});
+			this.gatherReferences();
+			this.gatherEventHandlers();
 			this.onTemplateLoaded();
+		});
+	}
+
+	get context() {
+		return this.templateContext;
+	}
+
+	set context(change) {
+		if (!Component.isObject(change)) {
+			throw Error(`Context has to be updated with an object. Got ${change}`);
+		}
+
+		this.templateContext = {
+			...this.templateContext,
+			...change,
+		};
+
+		Object.entries(change).forEach(([key, value]) => {
+			const selectorKeys = Component.isObject(value) ? [key, ...Component.spreadKey(key, value)] : [key];
+			selectorKeys.forEach(selectorKey => {
+				this.getElements(`[fiu-bind$="${selectorKey}"]`).forEach(element => {
+					const bindAttribute = element.getAttribute('fiu-bind');
+					let property = '';
+					let propertyName = bindAttribute;
+					if (bindAttribute.includes(':')) {
+						[property, propertyName] = bindAttribute.split(':');
+					}
+
+					const propertyValue = propertyName.split('.').reduce((blob, path) => blob[path], this.context);
+
+					if (element instanceof Component) {
+						element.context = {
+							[propertyName]: propertyValue,
+						};
+					} else {
+						if (!!property) {
+							element.setAttribute(property, propertyValue);
+						} else {
+							element.textContent = propertyValue;
+						}
+					}
+				});
+			});
+		});
+
+		this.onContextChange(change);
+	}
+
+	onContextChange(change) {
+	}
+
+	gatherReferences() {
+		this.getElements('[fiu-ref]').forEach(refElement => {
+			const prop = refElement.getAttribute('fiu-ref');
+			if (!!prop) {
+				this[prop] = refElement;
+			}
+		});
+	}
+
+	gatherEventHandlers() {
+		this.getElements('[fiu-handle]').forEach(element => {
+			const prop = element.getAttribute('fiu-handle');
+			if (!!prop) {
+				if (prop.includes(':')) {
+					const [eventName, handlerName] = prop.split(':');
+					if (!!this[handlerName.trim()]) {
+						element.addEventListener(eventName.trim(), ev => this[handlerName.trim()].call(this, ev));
+					} else {
+						console.log(`Handler ${handlerName} not present on component`);
+					}
+				} else {
+					console.log('Correct notation for fiu-handle is fiu-handle="event:handlerName"');
+				}
+			} else {
+				console.log('Not attaching anything to element, because nothing was specified', element);
+			}
 		});
 	}
 
@@ -244,37 +313,6 @@ export class Component extends HTMLElement {
 	}
 
 	/*
-	* This method is here, because ES5 does not have any decorators or I'd solve this problem with those. So... the problem:
-	*
-	* NOBODY WANTS TO FETCH ELEMENTS THAT ARE EXPECTED TO BE PRESENT WHEN COMPONENT'S TEMPLATE IS LOADED!
-	*
-	* So, to remedy this, I provided this method that works like this:
-	* ---return a dict with specs, that's it---
-	*
-	* This magic dict (do not try to repeat this 10 times!) should look like this:
-	*
-	* {
-	*   myField: 'div h1'
-	* }
-	*
-	* if you wish for (you repeated it 10 times, didn't you) your component to have this.myField populated with the DOM element reference to
-	* that h1.
-	*
-	* If you wish to populate a field with a node list, the dict should look something like this:
-	*
-	* {
-	*   myElements: '|all|ol li'
-	* }
-	*
-	* Why on this green Earth have I resorted to gibberish like "|all|". It's simple: to not complicate too much with nested dicts or some
-	* other solution, where you can choose which method to use, I resorted to a string which would produce an error if passed to
-	* querySelector or querySelectorAll, so you'd immediately know something's wrong (instantfacepalmfailure).
-	*/
-	populateFields() {
-		return {};
-	}
-
-	/*
 	* This method has an "overridden" signature;
 	*
 	* If you supply only the name of the attribute, this method will fetch component's attribute by that name
@@ -285,14 +323,6 @@ export class Component extends HTMLElement {
 			return this.getAttribute(name);
 		} else {
 			this.setAttribute(name, value);
-		}
-	}
-
-	attributeJSON(name, value) {
-		if (value === undefined) {
-			return JSON.parse(this.getAttribute(name));
-		} else {
-			this.setAttribute(name, JSON.stringify(value));
 		}
 	}
 
@@ -330,39 +360,13 @@ export class Component extends HTMLElement {
 		this.parentElement.removeChild(this);
 	}
 
-	static attachObservedAttributes(component) {
-		const observedAttributes = [];
-		Object.getOwnPropertyNames(component.prototype).forEach((classMember, index) => {
-			if (classMember.startsWith('observe')) {
-				observedAttributes.push(classMember.replace('observe', '').replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase());
-			}
+	static spreadKey(key, value) {
+		return Object.keys(value).map(innerKey => {
+			return Component.isObject(value[innerKey]) ? `${key}.${Component.spreadKey(innerKey, value[innerKey])}` : `${key}.${innerKey}`;
 		});
+	}
 
-		if (observedAttributes.length > 0) {
-			// Since this is a static property, we need to be sure, we don't try to redefine it, as the whole app goes kabloomey
-			if (Object.getOwnPropertyNames(component).indexOf('observedAttributes') === -1) {
-				Object.defineProperty(component, 'observedAttributes', {
-					get() {
-						return observedAttributes;
-					},
-				});
-
-				const changeResolvers = {};
-				observedAttributes.forEach((attribute, index) => {
-					component.prototype[attribute.replace(/-./g, x => x.toUpperCase()[1]) + 'Change'] = function (resolve) {
-						changeResolvers[
-						'observe' + attribute.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')
-							] = resolve;
-					};
-				});
-				component.prototype.attributeChangedCallback = function (name, oldValue, newValue) { // We must use "function" here, since we need "this" to be bound to the actual component instance, not the Component class
-					const method = 'observe' + name.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
-					this[method](oldValue, newValue);
-					if (!!changeResolvers[method]) {
-						changeResolvers[method](oldValue, newValue);
-					}
-				};
-			}
-		}
+	static isObject(obj) {
+		return Object.prototype.toString.call(obj) === '[object Object]';
 	}
 }
