@@ -142,9 +142,9 @@ import { App } from './app.js';
 * 	];
 *
 * 	constructor(params) { // For params, see sablono/fiu/router.js
-* 		super(TagComponent);  // This is the price you pay to avoid carfuffle of dealing with styles and templates
+* 		super();
 *       // Your code here
-* 	}
+* 	} // You may omit the constructor alltogether
 * }
 */
 import { Utils } from './utils.js';
@@ -163,37 +163,32 @@ export class Component extends HTMLElement {
 	*
 	* @constructor
 	* @author: www.unuaondo.com
-	* @param {class} clazz A JS class that would otherwise extend HTMLElement
 	*/
-	constructor(clazz) {
+	constructor() {
 		super();
 
 		// Template context, from which the template gets updated
 		this.templateContext = {};
 
-		if (!clazz) {
-			throw Error('Please provide the class for the component constructor, as such: super(MySuperYetSimpleAndCertainlyNotHackedComponent);');
-		}
-
 		this.attachShadow({
 			mode: 'open',
 		});
 
-		if (!!clazz.stylesheets) {
-			Utils.applyCss(clazz.stylesheets, this.shadowRoot);
+		if (!!this.constructor.stylesheets) {
+			Utils.applyCss(this.constructor.stylesheets, this.shadowRoot);
 		}
 
-		const injections = App.inject(clazz);
+		const injections = App.inject(this.constructor);
 		Object.keys(injections).forEach((propertyName) => {
 			this[propertyName] = injections[propertyName];
 		});
 		if (!!App.loggerFactory) {
-			this.logger = App.loggerFactory.getLogger(clazz);
+			this.logger = App.loggerFactory.getLogger(this.constructor);
 		}
 
 
-		if (!!clazz.registerComponents) {
-			clazz.registerComponents.forEach((component) => {
+		if (!!this.constructor.registerComponents) {
+			this.constructor.registerComponents.forEach((component) => {
 				if (Component.registeredComponents.indexOf(component) === -1) {  // Should not load twice, right
 					customElements.define(component.tagName, component);
 					Component.registeredComponents.push(component);
@@ -205,8 +200,8 @@ export class Component extends HTMLElement {
 		}
 
 		this.templateLoaded = new Promise(resolve => {
-			if (!!clazz.template) {
-				Utils.getTemplateHTML(clazz.template, this.shadowRoot, resolve);
+			if (!!this.constructor.template) {
+				Utils.getTemplateHTML(this.constructor.template, this.shadowRoot, resolve);
 			} else {
 				resolve();
 			}
