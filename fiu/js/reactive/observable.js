@@ -68,13 +68,13 @@ export class Observable {
 }
 
 export class EmptyObservable extends Observable {
-    constructor() {
-        super();
-    }
+	constructor() {
+		super();
+	}
 
-    _subscribe(subscriber) {
-        subscriber.complete();
-    }
+	_subscribe(subscriber) {
+		subscriber.complete();
+	}
 }
 
 export function never() {

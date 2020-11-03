@@ -1,5 +1,4 @@
 import { Authentication } from './authentication.js';
-import { Component } from './component.js';
 import { Http } from './http.js';
 import { LoggerFactory } from './logging.js';
 import { Router } from './router.js';
@@ -23,7 +22,9 @@ export class App {
 		}
 
 		if (!!config.rootStylesheets) {
-			Utils.applyCss(config.rootStylesheets, document);
+			config.rootStylesheets.forEach(stylesheet => {
+				Utils.applyCss(stylesheet, document);
+			});
 		}
 
 		if (!!config.providers) {
@@ -71,7 +72,7 @@ export class App {
 
 				config.onAppReady.forEach(fn => fn());
 
-				resolve();
+				resolve(this);
 			});
 		});
 

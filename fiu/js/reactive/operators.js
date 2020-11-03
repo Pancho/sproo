@@ -1,4 +1,4 @@
-import { Observable, EmptyObservable } from './observable.js';
+import { EmptyObservable, Observable } from './observable.js';
 import { InnerSubscriber, OuterSubscriber, Subscriber } from './subscriber.js';
 
 function subscribeToResult(outerSubscriber, result, outerValue, outerIndex) {

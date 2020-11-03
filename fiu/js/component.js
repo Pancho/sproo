@@ -156,8 +156,10 @@ export class Component extends HTMLElement {
 	// This property tells whether this component has been removed from the host document
 	unloaded = false;
 
-	// Promise, for if you need to react on template loaded event, but aren't in the onTemplateLoaded method
-	templateLoaded;
+	// Index of bound elements. Can change during runtime as it gets updated (or rather overwritten) on every mutation.
+	bindingIndex = {};
+
+	// Promise that's resolved when the onTemplateLoaded has already been executed
 
 	/* Creates an instance of Component, which is really just a convenience wrapper for HTMLElement (the actual component)
 	*
@@ -174,8 +176,13 @@ export class Component extends HTMLElement {
 			mode: 'open',
 		});
 
+		const styleSheetPromises = [];
 		if (!!this.constructor.stylesheets) {
-			Utils.applyCss(this.constructor.stylesheets, this.shadowRoot);
+			this.constructor.stylesheets.forEach(stylesheet => {
+				styleSheetPromises.push(
+					new Promise(resolve => Utils.applyCss(stylesheet, this.shadowRoot, resolve)),
+				);
+			});
 		}
 
 		const injections = App.inject(this.constructor);
@@ -185,7 +192,6 @@ export class Component extends HTMLElement {
 		if (!!App.loggerFactory) {
 			this.logger = App.loggerFactory.getLogger(this.constructor);
 		}
-
 
 		if (!!this.constructor.registerComponents) {
 			this.constructor.registerComponents.forEach((component) => {
@@ -199,23 +205,64 @@ export class Component extends HTMLElement {
 			});
 		}
 
-		this.templateLoaded = new Promise(resolve => {
+		const templateReady = new Promise(resolve => {
 			if (!!this.constructor.template) {
-				Utils.getTemplateHTML(this.constructor.template, this.shadowRoot, resolve);
+				Utils.getTemplateHTML(this.constructor.template, resolve);
 			} else {
 				resolve();
 			}
 		});
 
-		Promise.all([
-			App.appReady,
-			this.templateLoaded,
-		]).then(() => {
-			this.app = App.instance;
-			this.app.router.updatePageLinks(this.shadowRoot);
-			this.gatherReferences();
-			this.gatherEventHandlers();
-			this.onTemplateLoaded();
+		this.templateLoaded = new Promise(resolve => {
+			Promise.all([
+				App.appReady,
+				templateReady,
+				...styleSheetPromises,
+			]).then(([app, templateDocument]) => {
+				this.app = app;
+				if (templateDocument instanceof Node) {
+					// const measurements = [];
+					// for (let i = 0; i < 10; i += 1) {
+					// 	const start = performance.now();
+					// 	this.gatherFiuAttributes(templateDocument);
+					// 	const end = performance.now()
+					// 	measurements.push(end - start);
+					// }
+					// console.log(this.tagName, 'gatherFiuAttributes avg: ', measurements.reduce((prev, curr) => prev + curr, 0), measurements.reduce((prev, curr) => prev + curr, 0) / measurements.length);
+					this.gatherFiuAttributes(templateDocument);
+					this.shadowRoot.append(templateDocument);
+					this.app.router.updatePageLinks(this.shadowRoot);
+					this.onTemplateLoaded();
+					resolve();
+				}
+			});
+		});
+	}
+
+	gatherFiuAttributes(templateDocument) {
+		templateDocument.querySelectorAll('*').forEach(refElement => {
+			const attributeNames = refElement.getAttributeNames();
+			if (attributeNames.length > 0) {
+				attributeNames.forEach(attributeName => {
+					if (attributeName === 'fiu-ref') {
+						this[refElement.getAttribute(attributeName)] = refElement;
+					} else if (attributeName.startsWith('(') && attributeName.endsWith(')')) {
+						const eventName = attributeName.replace('(', '').replace(')', '').trim(),
+							handlerName = this[attributeName].trim();
+						if (typeof this[attributeName] === 'function') {
+							refElement.addEventListener(eventName, ev => this[handlerName].call(this, ev));
+						} else {
+							console.log(`Handler ${handlerName} not present on component`);
+						}
+					} else if (attributeName.startsWith('[') && attributeName.endsWith(']')) {
+						let propertyName = attributeName.replace('[', '').replace(']', '').trim();
+						if (propertyName.includes('.')) {
+							propertyName = propertyName.replace('.', '\\.');
+						}
+						this.bindingIndex[refElement.getAttribute(attributeName)] = propertyName;
+					}
+				});
+			}
 		});
 	}
 
@@ -234,65 +281,35 @@ export class Component extends HTMLElement {
 		};
 
 		Object.entries(change).forEach(([key, value]) => {
-			const selectorKeys = Component.isObject(value) ? [key, ...Component.spreadKey(key, value)] : [key];
+			const selectorKeys = Component.isObject(value) ? [key, ...Component.spreadPath(key, value).flat()] : [key];
 			selectorKeys.forEach(selectorKey => {
-				this.getElements(`[fiu-bind$="${selectorKey}"]`).forEach(element => {
-					const bindAttribute = element.getAttribute('fiu-bind');
-					let property = '';
-					let propertyName = bindAttribute;
-					if (bindAttribute.includes(':')) {
-						[property, propertyName] = bindAttribute.split(':');
-					}
+				if (selectorKey in this.bindingIndex) {
+					let innerAttributeName = this.bindingIndex[selectorKey];
 
-					const propertyValue = propertyName.split('.').reduce((blob, path) => blob[path], this.context);
-
-					if (element instanceof Component) {
-						element.context = {
-							[propertyName]: propertyValue,
-						};
-					} else {
-						if (!!property) {
-							element.setAttribute(property, propertyValue);
+					this.getElements(`[\\[${innerAttributeName}\\]="${selectorKey}"]`).forEach(elm => {
+						const boundValue = selectorKey.split('.').reduce((blob, prevKey) => blob[prevKey], change);
+						if (innerAttributeName.includes('.')) {
+							const split = innerAttributeName.split('\\.');
+							if (split[0] === 'attr') {
+								elm.setAttribute(split[1], boundValue);
+							} else if (split[0] === 'style') {
+								elm.style[split[1]] = boundValue;
+							}
 						} else {
-							element.textContent = propertyValue;
+							if (elm instanceof Component) {
+								elm.templateLoaded.then(() => {
+									elm.context = {
+										[innerAttributeName]: boundValue,
+									};
+									elm[innerAttributeName] = boundValue;
+								});
+							} else {
+								elm[innerAttributeName] = boundValue;
+							}
 						}
-					}
-				});
-			});
-		});
-
-		this.onContextChange(change);
-	}
-
-	onContextChange(change) {
-	}
-
-	gatherReferences() {
-		this.getElements('[fiu-ref]').forEach(refElement => {
-			const prop = refElement.getAttribute('fiu-ref');
-			if (!!prop) {
-				this[prop] = refElement;
-			}
-		});
-	}
-
-	gatherEventHandlers() {
-		this.getElements('[fiu-handle]').forEach(element => {
-			const prop = element.getAttribute('fiu-handle');
-			if (!!prop) {
-				if (prop.includes(':')) {
-					const [eventName, handlerName] = prop.split(':');
-					if (!!this[handlerName.trim()]) {
-						element.addEventListener(eventName.trim(), ev => this[handlerName.trim()].call(this, ev));
-					} else {
-						console.log(`Handler ${handlerName} not present on component`);
-					}
-				} else {
-					console.log('Correct notation for fiu-handle is fiu-handle="event:handlerName"');
+					});
 				}
-			} else {
-				console.log('Not attaching anything to element, because nothing was specified', element);
-			}
+			});
 		});
 	}
 
@@ -355,9 +372,13 @@ export class Component extends HTMLElement {
 		this.parentElement.removeChild(this);
 	}
 
-	static spreadKey(key, value) {
+	static spreadPath(key, value) {
 		return Object.keys(value).map(innerKey => {
-			return Component.isObject(value[innerKey]) ? `${key}.${Component.spreadKey(innerKey, value[innerKey])}` : `${key}.${innerKey}`;
+			if (Component.isObject(value[innerKey])) {
+				return [`${key}.${innerKey}`, Component.spreadPath(innerKey, value[innerKey]).map(newKey => `${key}.${newKey}`)].flat();
+			} else {
+				return `${key}.${innerKey}`;
+			}
 		});
 	}
 

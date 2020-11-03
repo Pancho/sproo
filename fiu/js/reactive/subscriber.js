@@ -150,7 +150,7 @@ export class Subscriber extends Subscription {
 
 	constructor(destinationOrNext, error, complete) {
 		super();
-		
+
 		if (arguments.length === 0) {
 			this.destination = EMPTY_OBSERVER;
 		} else if (arguments.length === 1) {
@@ -212,14 +212,14 @@ export class Subscriber extends Subscription {
 	}
 
 	unsubscribeAndRecycle() {
-        const { parents } = this;
-        this.parents = null;
-        this.unsubscribe();
-        this.closed = false;
-        this.stopped = false;
-        this.parents = parents;
-        return this;
-    }
+		const {parents} = this;
+		this.parents = null;
+		this.unsubscribe();
+		this.closed = false;
+		this.stopped = false;
+		this.parents = parents;
+		return this;
+	}
 
 	static toSubscriber(observerOrNext, error, complete) {
 		if (!!observerOrNext && observerOrNext instanceof Subscriber) {
@@ -340,34 +340,39 @@ class SafeSubscriber extends Subscriber {
 }
 
 export class OuterSubscriber extends Subscriber {
-    notifyNext(outerValue, innerValue) {
-        this.destination.next(innerValue);
-    }
-    notifyError(error, innerSub) {
-        this.destination.error(error);
-    }
-    notifyComplete(innerSub) {
-        this.destination.complete();
-    }
+	notifyNext(outerValue, innerValue) {
+		this.destination.next(innerValue);
+	}
+
+	notifyError(error, innerSub) {
+		this.destination.error(error);
+	}
+
+	notifyComplete(innerSub) {
+		this.destination.complete();
+	}
 }
 
 export class InnerSubscriber extends Subscriber {
-    constructor(parent, outerValue, outerIndex) {
-        super();
-        this.parent = parent;
-        this.outerValue = outerValue;
-        this.outerIndex = outerIndex;
-        this.index = 0;
-    }
-    _next(value) {
-        this.parent.notifyNext(this.outerValue, value, this.outerIndex, this.index++, this);
-    }
-    _error(error) {
-        this.parent.notifyError(error, this);
-        this.unsubscribe();
-    }
-    _complete() {
-        this.parent.notifyComplete(this);
-        this.unsubscribe();
-    }
+	constructor(parent, outerValue, outerIndex) {
+		super();
+		this.parent = parent;
+		this.outerValue = outerValue;
+		this.outerIndex = outerIndex;
+		this.index = 0;
+	}
+
+	_next(value) {
+		this.parent.notifyNext(this.outerValue, value, this.outerIndex, this.index++, this);
+	}
+
+	_error(error) {
+		this.parent.notifyError(error, this);
+		this.unsubscribe();
+	}
+
+	_complete() {
+		this.parent.notifyComplete(this);
+		this.unsubscribe();
+	}
 }
