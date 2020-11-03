@@ -248,8 +248,8 @@ export class Component extends HTMLElement {
 						this[refElement.getAttribute(attributeName)] = refElement;
 					} else if (attributeName.startsWith('(') && attributeName.endsWith(')')) {
 						const eventName = attributeName.replace('(', '').replace(')', '').trim(),
-							handlerName = this[attributeName].trim();
-						if (typeof this[attributeName] === 'function') {
+							handlerName = refElement.getAttribute(attributeName);
+						if (typeof this[handlerName] === 'function') {
 							refElement.addEventListener(eventName, ev => this[handlerName].call(this, ev));
 						} else {
 							console.log(`Handler ${handlerName} not present on component`);
@@ -304,7 +304,11 @@ export class Component extends HTMLElement {
 									elm[innerAttributeName] = boundValue;
 								});
 							} else {
-								elm[innerAttributeName] = boundValue;
+								if (!!Utils.propertyNamesMap[innerAttributeName]) {
+									elm[Utils.propertyNamesMap[innerAttributeName]] = boundValue;
+								} else {
+									elm[innerAttributeName] = boundValue;
+								}
 							}
 						}
 					});
