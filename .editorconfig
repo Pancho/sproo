@@ -1,0 +1,40 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# Atom
+# https://github.com/sindresorhus/atom-editorconfig#readme
+# Notepad++
+# https://github.com/editorconfig/editorconfig-notepad-plus-plus#readme
+# PHPStorm
+# https://plugins.jetbrains.com/plugin/7294
+# Sublime Text
+# https://github.com/sindresorhus/editorconfig-sublime#readme
+
+# top-most EditorConfig file
+root = true
+
+[*.js]
+charset = utf-8
+indent_style = tab
+tab_width = 4
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 140
+
+[*.html]
+charset = utf-8
+indent_style = tab
+tab_width = 4
+end_of_line = lf
+insert_final_newline = false
+trim_trailing_whitespace = true
+max_line_length = off
+
+[*.css]
+charset = utf-8
+indent_style = tab
+tab_width = 4
+end_of_line = lf
+insert_final_newline = false
+trim_trailing_whitespace = true
+max_line_length = off

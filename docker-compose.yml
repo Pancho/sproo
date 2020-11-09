@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  server:
+    image: nginx:latest
+    restart: always
+    ports:
+      - 80:80
+    volumes:
+      - ${STATIC_PATH:?You need to set up the .env file. See docker-compose.yml for quick reference.}:/code
+      - ${FIU_PATH:?You need to set up the .env file. See docker-compose.yml for quick reference.}:/code/fiu
+      - ${TESTS_PATH:?You need to set up the .env file. See docker-compose.yml for quick reference.}:/code/tests
+      - ${NGINX_CONF_PATH:?You need to set up the .env file. See docker-compose.yml for quick reference.}:/etc/nginx/conf.d

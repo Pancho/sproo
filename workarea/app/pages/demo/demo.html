@@ -1,0 +1,13 @@
+<template>
+	<main class="bg-bluegrey-5" (click)="logEvent">
+		<div>
+			<h2>Fiu test grounds</h2>
+			<a route="/empty">To Empty</a>
+			<a route="/empty/test">To Empty Test</a>
+			<div fiu-ref="paragraphContainer">
+				<p [textContent]="blah"></p>
+			</div>
+			<child-component [coords]="coords"></child-component>
+		</div>
+	</main>
+</template>
