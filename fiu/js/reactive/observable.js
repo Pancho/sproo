@@ -124,6 +124,10 @@ export function fromEvent(source, event) {
 			return observer.next(e);
 		};
 
+		if (typeof source === 'string') {
+			source = document.querySelector(source);
+		}
+
 		source.addEventListener(event, callbackFn);
 		observer.add(() => source.removeEventListener(event, callbackFn));
 

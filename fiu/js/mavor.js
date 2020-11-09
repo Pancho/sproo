@@ -161,6 +161,18 @@ export class Mavor {
 		return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 	}
 
+	static slugify(text) {
+		return text
+			.toString()
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '')
+			.toLowerCase()
+			.trim()
+			.replace(/\s+/g, '-')
+			.replace(/[^\w-]+/g, '')
+			.replace(/--+/g, '-');
+	}
+
 	static elementContains(parent, child) {
 		return parent !== child && parent.contains(child);
 	}
@@ -343,7 +355,7 @@ export class Mavor {
 	static setCookie(name, value, days) {
 		const newDate = new Date;
 		newDate.setTime(newDate.getTime() + 24 * 60 * 60 * 1000 * days);
-		document.cookie = name + "=" + value + ";path=/;expires=" + newDate.toUTCString();
+		document.cookie = name + '=' + value + ';path=/;expires=' + newDate.toUTCString();
 	}
 
 	static removeCookie(name) {
