@@ -1,6 +1,4 @@
 import { Mavor } from '../fiu/js/mavor.js';
-import { fromEvent, of } from '../fiu/js/reactive/observable.js';
-import { filter, map, tap } from '../fiu/js/reactive/operators.js';
 import { Manager } from './api/manager.js';
 import { DatabaseSuite } from './spec/database/database-suite.js';
 import { MavorSuite } from './spec/mavor/mavor-suite.js';
@@ -17,19 +15,19 @@ class Tests {
 	}
 
 	initNavigation() {
-		of(...Object.entries(this.manager.suites)).pipe(
-			tap(([slug, suite]) => this.nav.append(Mavor.createElement(`<a href="#${slug}">${suite.name}</a>`))),
-		).subscribe();
+		Object.entries(this.manager.suites).forEach(([slug, suite]) => {
+			this.nav.append(Mavor.createElement(`<a href="#${slug}">${suite.name}</a>`));
+		});
 
-		fromEvent(this.nav, 'click').pipe(
-			filter(ev => ev.target.tagName.toLowerCase() === 'a'),
-			tap(ev => ev.preventDefault()),
-			map(ev => ev.target.getAttribute('href')),
-			tap(target => {
-				window.location.hash = target;
-				this.setupContent(target);
-			}),
-		).subscribe();
+		this.nav.addEventListener('click', ev => {
+			const target = ev.target.getAttribute('href');
+			if (ev.target.tagName.toLowerCase() !== 'a') {
+				return;
+			}
+			ev.preventDefault()
+			window.location.hash = target;
+			this.setupContent(target);
+		});
 
 		if (!!window.location.hash) {
 			this.setupContent(window.location.hash);
