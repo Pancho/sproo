@@ -1,5 +1,5 @@
 import { Suite } from '../../api/suite.js';
-import { MavorSlugifyNonASCIICharactersTest, MavorSlugifyTest, MavorSlugifyUnknownCharacterTest } from './mavor-slugify.js';
+import { MavorSlugifyNonASCIICharactersTest, MavorSlugifyTest, MavorSlugifyUnknownCharacterTest } from './mavor.js';
 
 export class MavorSuite extends Suite {
 	constructor() {

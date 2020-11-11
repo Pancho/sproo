@@ -18,4 +18,8 @@ export class Suite {
 	executeSuite() {
 		Object.values(this.tests).forEach(test => test.run());
 	}
+
+	teardown() {
+
+	}
 }

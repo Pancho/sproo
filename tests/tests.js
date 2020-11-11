@@ -24,7 +24,7 @@ class Tests {
 			if (ev.target.tagName.toLowerCase() !== 'a') {
 				return;
 			}
-			ev.preventDefault()
+			ev.preventDefault();
 			window.location.hash = target;
 			this.setupContent(target);
 		});
@@ -44,6 +44,11 @@ class Tests {
 			</div>`),
 			control = Mavor.createElement(`<div class="control">
 				<p>Tests in suite: ${Object.entries(suite.tests).length}</p>
+				<p class="result-count">
+					<span class="successful"></span>
+					<span class="failed"></span>
+					<span class="exception"></span>
+				</p>
 				<div class="progress">
 					<div class="progress-bar"></div>
 				</div>
@@ -92,9 +97,13 @@ class Tests {
 		control.querySelector('.run-suite').addEventListener('click', ev => {
 			const listItems = testList.querySelectorAll('li'),
 				step = 100 / listItems.length;
-			let percentage = 0;
+			let percentage = 0,
+				successful = 0,
+				failed = 0,
+				exception = 0;
 
 			ev.preventDefault();
+			control.querySelector('.result-count').style.display = 'none';
 			testList.querySelectorAll('li').forEach(listItem => {
 				const selectedTest = suite.tests[listItem.dataset.slug],
 					resultPlaceholder = listItem.querySelector('.result'),
@@ -105,13 +114,20 @@ class Tests {
 					resultPlaceholder.textContent = selectedTest.resultMessage;
 					if (selectedTest.succeeded) {
 						resultPlaceholder.classList.add('success');
+						successful += 1;
 					} else if (selectedTest.failed) {
 						resultPlaceholder.classList.add('failed');
+						failed += 1;
 					} else if (selectedTest.exception) {
 						resultPlaceholder.classList.add('exception');
+						exception += 1;
 					}
 					percentage += step;
-					control.querySelector('.progress .progress-bar').style.width = `${percentage}%`;
+					control.querySelector('.progress .progress-bar').style.width = `${percentage.toFixed(8)}%`;
+					control.querySelector('.successful').textContent = `Successful: ${successful}`;
+					control.querySelector('.failed').textContent = `Failed: ${failed}`;
+					control.querySelector('.exception').textContent = `Exception: ${exception}`;
+					control.querySelector('.result-count').style.display = 'block';
 				});
 			});
 		});

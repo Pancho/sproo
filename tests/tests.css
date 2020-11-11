@@ -30,6 +30,11 @@ nav a:hover {padding:10px 20px 10px 30px;}
 .content .control p {font-size:14px;line-height:20px;}
 .content .control .progress {margin:10px 0;border:1px solid rgba(230,230,230,1.0);position:relative;height:8px;}
 .content .control .progress .progress-bar {position:absolute;background-color:rgba(76,175,80,1.0);height:8px;top:0;left:0;}
+.content .result-count {margin:10px 0 0 20px;font-size:12px;line-height:16px;display:none;}
+.content .result-count span {display:block;cursor:pointer;}
+.content .result-count .successful {color:rgba(76,175,80,1.0);}
+.content .result-count .failed {color:rgba(244,67,54,1.0);}
+.content .result-count .exception {color:rgba(101,31,255,1.0);}
 
 .test-list {}
 .test-list li {display:flex;flex-direction:row;border-bottom:1px solid rgba(230,230,230,1.0);margin:0 0 10px 0;padding:0 0 10px 0;}
