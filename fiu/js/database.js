@@ -1,3 +1,5 @@
+// This is an IndexedDB wrapper with a more friendly interface
+// TODO: docs
 export class Database {
 	name;
 	dbReady;
