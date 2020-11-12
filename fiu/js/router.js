@@ -143,8 +143,10 @@ export class Router {
 			);
 		});
 		this.resolve();
+	}
 
-		return this;
+	get [Symbol.toStringTag]() {
+		return 'Router';
 	}
 
 	destroy() {

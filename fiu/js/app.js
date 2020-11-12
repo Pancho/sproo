@@ -12,9 +12,7 @@ export class App {
 	router = null;
 	http = null;
 
-	constructor(
-		config,
-	) {
+	constructor(config) {
 		let authentication;
 
 		if (!!App.instance) {
@@ -77,6 +75,10 @@ export class App {
 		});
 
 		return this;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'App';
 	}
 
 	static provide(clazz, name, config) {

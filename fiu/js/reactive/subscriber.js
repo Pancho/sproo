@@ -25,6 +25,10 @@ export class Subscription {
 		}
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Subscription';
+	}
+
 	unsubscribe() {
 		let hasErrors = false;
 		let errors;
@@ -123,6 +127,10 @@ export class SubjectSubscription extends Subscription {
 		this.closed = false;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'SubjectSubscription';
+	}
+
 	unsubscribe() {
 		if (this.closed) {
 			return;
@@ -167,6 +175,10 @@ export class Subscriber extends Subscription {
 		} else {
 			this.destination = new SafeSubscriber(this, destinationOrNext, error, complete);
 		}
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'Subscriber';
 	}
 
 	next(value) {
@@ -263,6 +275,10 @@ class SafeSubscriber extends Subscriber {
 		this._complete = complete;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'SafeSubscriber';
+	}
+
 	next(value) {
 		if (!this.stopped && this._next) {
 			if (!this.parentSubscriber.syncErrorThrowable) {
@@ -340,6 +356,10 @@ class SafeSubscriber extends Subscriber {
 }
 
 export class OuterSubscriber extends Subscriber {
+	get [Symbol.toStringTag]() {
+		return 'OuterSubscriber';
+	}
+
 	notifyNext(outerValue, innerValue) {
 		this.destination.next(innerValue);
 	}
@@ -360,6 +380,10 @@ export class InnerSubscriber extends Subscriber {
 		this.outerValue = outerValue;
 		this.outerIndex = outerIndex;
 		this.index = 0;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'InnerSubscriber';
 	}
 
 	_next(value) {

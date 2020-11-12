@@ -11,6 +11,10 @@ export class Observable {
 		}
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Observable';
+	}
+
 	lift(operator) {
 		const observable = new Observable();
 		observable.source = this;
@@ -70,6 +74,10 @@ export class Observable {
 export class EmptyObservable extends Observable {
 	constructor() {
 		super();
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'EmptyObservable';
 	}
 
 	_subscribe(subscriber) {

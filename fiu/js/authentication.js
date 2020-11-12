@@ -11,6 +11,10 @@ export class Authentication {
 		Authentication.instance = this;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Authentication';
+	}
+
 	/**
 	 * This method MUST return options whether you modified it or not or a new dict, just make sure you populate it with right params.
 	 * @param options

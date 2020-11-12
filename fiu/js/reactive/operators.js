@@ -28,6 +28,10 @@ class SnapshotSubscriber extends Subscriber {
 		this.prefix = prefix;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'SnapshotSubscriber';
+	}
+
 	_next(value) {
 		if (this.prefix) {
 			console.log(this.prefix, value);
@@ -50,6 +54,10 @@ class PluckSubscriber extends Subscriber {
 	constructor(destination, path) {
 		super(destination);
 		this.path = path;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'PluckSubscriber';
 	}
 
 	_next(value) {
@@ -80,6 +88,10 @@ class MapSubscriber extends Subscriber {
 		this.thisArg = thisArg || this;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'MapSubscriber';
+	}
+
 	_next(value) {
 		let result;
 		try {
@@ -106,6 +118,10 @@ class MapToSubscriber extends Subscriber {
 		this.value = value;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'MapToSubscriber';
+	}
+
 	_next(value) {
 		this.destination.next(this.value);
 	}
@@ -124,6 +140,10 @@ class FilterSubscriber extends Subscriber {
 		super(destination);
 		this.predicate = predicate;
 		this.count = 0;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'FilterSubscriber';
 	}
 
 	_next(value) {
@@ -155,6 +175,10 @@ class TapSubscriber extends Subscriber {
 		safeSubscriber.syncErrorThrowable = true;
 		this.add(safeSubscriber);
 		this.safeSubscriber = safeSubscriber;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'TapSubscriber';
 	}
 
 	_next(value) {
@@ -200,6 +224,10 @@ class CatchErrorOuterSubscriber extends OuterSubscriber {
 		this.caught = caught;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'CatchErrorOuterSubscriber';
+	}
+
 	error(err) {
 		if (!this.stopped) {
 			let result;
@@ -229,6 +257,10 @@ class TakeSubscriber extends Subscriber {
 		super(destination);
 		this.total = total;
 		this.count = 0;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'TakeSubscriber';
 	}
 
 	_next(value) {
@@ -265,6 +297,10 @@ class SkipSubscriber extends Subscriber {
 		this.count = 0;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'SkipSubscriber';
+	}
+
 	_next(value) {
 		this.count += 1;
 		if (this.count > this.total) {
@@ -286,6 +322,10 @@ class TakeUntilOuterSubscriber extends OuterSubscriber {
 		super(destination);
 		this.notifier = notifier;
 		this.add(subscribeToResult(this, notifier));
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'TakeUntilOuterSubscriber';
 	}
 
 	notifyNext(outerValue, innerValue, outerIndex, innerIndex, innerSub) {
@@ -312,6 +352,10 @@ class SwitchMapOuterSubscriber extends OuterSubscriber {
 	constructor(destination, projector) {
 		super(destination);
 		this.projector = projector;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'SwitchMapOuterSubscriber';
 	}
 
 	_next(value) {
@@ -380,6 +424,10 @@ class DistinctUntilChangedSubscriber extends Subscriber {
 		}
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'DistinctUntilChangedSubscriber';
+	}
+
 	compare(x, y) {
 		return x === y;
 	}
@@ -427,6 +475,10 @@ class ScanSubscriber extends Subscriber {
 		this._seed = _seed;
 		this.hasSeed = hasSeed;
 		this.index = 0;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'ScanSubscriber';
 	}
 
 	get seed() {
@@ -484,6 +536,10 @@ class WithLatestFromSubscriber extends OuterSubscriber {
 		}
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'WithLatestFromSubscriber';
+	}
+
 	notifyNext(outerValue, innerValue, outerIndex, innerIndex, innerSub) {
 		this.values[outerIndex] = innerValue;
 		if (this.toRespond.length > 0) {
@@ -538,6 +594,10 @@ class SwitchFirstMapSubscriber extends OuterSubscriber {
 		this.hasSubscription = false;
 		this.hasCompleted = false;
 		this.index = 0;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'SwitchFirstMapSubscriber';
 	}
 
 	_next(value) {
@@ -608,6 +668,10 @@ class HandlePromiseSubscriber extends Subscriber {
 		this.thenHandler = thenHandler;
 		this.catchHandler = catchHandler;
 		this.count = 0;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'HandlePromiseSubscriber';
 	}
 
 	_next(promise) {
