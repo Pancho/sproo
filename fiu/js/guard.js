@@ -1,6 +1,10 @@
 export class Guard {
 	constructor() {}
 
+	get [Symbol.toStringTag]() {
+		return 'Guard';
+	}
+
 	/**
 	 * If you override this method, you're probably in quite some trouble... leave it.
 	 */

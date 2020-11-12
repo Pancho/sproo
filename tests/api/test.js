@@ -19,6 +19,10 @@ export class Test {
 		this.doc = doc;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Test';
+	}
+
 	async assertEquals(value, expectedValue) {
 		return new Promise((resolve, reject) => {
 			if (value === expectedValue) {

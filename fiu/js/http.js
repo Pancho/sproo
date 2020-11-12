@@ -23,6 +23,10 @@ export class Http {
 		this.authentication = authentication;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Http';
+	}
+
 	constructUrl(path, params) {
 		let queryString = '';
 		path = path.startsWith('/') ? path.slice(1) : path;
@@ -39,7 +43,7 @@ export class Http {
 	}
 
 	// MDN: The GET method requests a representation of the specified resource. Requests using GET should only retrieve data.
-	get(path, params, httpHeaders, authenticate = true) {
+	async get(path, params, httpHeaders, authenticate = true) {
 		const headers = {
 			...Http.STANDARD_HEADERS,
 			...httpHeaders,
@@ -48,11 +52,11 @@ export class Http {
 			headers: headers,
 		}, url = this.constructUrl(path, params);
 
-		return this.fetch(url, options, authenticate);
+		return await this.fetch(url, options, authenticate);
 	}
 
 	// MDN: The HEAD method asks for a response identical to that of a GET request, but without the response body.
-	head(path, params, httpHeaders, authenticate = true) {
+	async head(path, params, httpHeaders, authenticate = true) {
 		const headers = {
 			...Http.STANDARD_HEADERS,
 			...httpHeaders,
@@ -61,11 +65,11 @@ export class Http {
 			headers: headers,
 		}, url = this.constructUrl(path, params);
 
-		return this.fetch(url, options, authenticate);
+		return await this.fetch(url, options, authenticate);
 	}
 
 	// MDN: The DELETE method deletes the specified resource.
-	delete(path, params, httpHeaders, authenticate = true) {
+	async delete(path, params, httpHeaders, authenticate = true) {
 		const headers = {
 			...Http.STANDARD_HEADERS,
 			...httpHeaders,
@@ -74,11 +78,11 @@ export class Http {
 			headers: headers,
 		}, url = this.constructUrl(path, params);
 
-		return this.fetch(url, options, authenticate);
+		return await this.fetch(url, options, authenticate);
 	}
 
 	// MDN: The OPTIONS method is used to describe the communication options for the target resource.
-	options(path, params, httpHeaders, authenticate = true) {
+	async options(path, params, httpHeaders, authenticate = true) {
 		const headers = {
 			...Http.STANDARD_HEADERS,
 			...httpHeaders,
@@ -87,11 +91,11 @@ export class Http {
 			headers: headers,
 		}, url = this.constructUrl(path, params);
 
-		return this.fetch(url, options, authenticate);
+		return await this.fetch(url, options, authenticate);
 	}
 
 	// MDN: The POST method is used to submit an entity to the specified resource, often causing a change in state or side effects on the server.
-	post(path, body, fetchOptions, httpHeaders, authenticate = true) {
+	async post(path, body, fetchOptions, httpHeaders, authenticate = true) {
 		const headers = {
 			...Http.STANDARD_HEADERS,
 			...httpHeaders,
@@ -102,11 +106,11 @@ export class Http {
 			...fetchOptions,
 		}, url = this.constructUrl(path);
 
-		return this.fetch(url, options, authenticate);
+		return await this.fetch(url, options, authenticate);
 	}
 
 	// MDN: The PUT method replaces all current representations of the target resource with the request payload.
-	put(path, body, fetchOptions, httpHeaders, authenticate = true) {
+	async put(path, body, fetchOptions, httpHeaders, authenticate = true) {
 		const headers = {
 			...Http.STANDARD_HEADERS,
 			...httpHeaders,
@@ -117,16 +121,14 @@ export class Http {
 			...fetchOptions,
 		}, url = this.constructUrl(path);
 
-		return this.fetch(url, options, authenticate);
+		return await this.fetch(url, options, authenticate);
 	}
 
-	fetch(url, options, authenticate) {
+	async fetch(url, options, authenticate) {
 		if (authenticate) {
-			return window.fetch(url, this.authentication.addAuthentication(options));
+			return await window.fetch(url, this.authentication.addAuthentication(options));
 		} else {
-			return window.fetch(url, options);
+			return await window.fetch(url, options);
 		}
 	}
-
-	// TODO: Think about web sockets and whether there's a way to simplify it. If not, just remove this comment.
 }

@@ -8,6 +8,10 @@ export class Suite {
 		this.name = name;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Suite';
+	}
+
 	registerTest(test) {
 		if (Mavor.slugify(test.name) in this.tests) {
 			throw new Error(`Cannot register two suites with the same name (${suite.name})`);

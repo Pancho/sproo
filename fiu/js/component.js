@@ -239,6 +239,10 @@ export class Component extends HTMLElement {
 		});
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Component';
+	}
+
 	gatherFiuAttributes(templateDocument) {
 		templateDocument.querySelectorAll('*').forEach(refElement => {
 			const attributeNames = refElement.getAttributeNames();

@@ -58,6 +58,10 @@ export class LoggerFactory {
 	constructor() {
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'LoggerFactory';
+	}
+
 	noop() {
 	}
 

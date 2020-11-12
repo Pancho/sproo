@@ -7,10 +7,7 @@ let store = {};
 class State extends BehaviorSubject {
 	store;
 
-	constructor(
-		store,
-		action$,
-	) {
+	constructor(store, action$) {
 		super(store);
 		this.store = store;
 		this.stateSubscription = action$.subscribe(action => {
@@ -33,6 +30,10 @@ class State extends BehaviorSubject {
 				});
 			}
 		});
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'State';
 	}
 
 	complete() {
@@ -64,6 +65,10 @@ export class Store extends Observable {
 		this.store = Store.getSlice(slice, store);
 		this.action$ = new BehaviorSubject(this.store);
 		this.source = new State(this.store, this.action$);
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'Store';
 	}
 
 	dispatch(action) {

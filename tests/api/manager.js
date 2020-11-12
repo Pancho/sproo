@@ -6,6 +6,10 @@ export class Manager {
 	constructor() {
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Manager';
+	}
+
 	addSuite(suite) {
 		if (Mavor.slugify(suite.name) in this.suites) {
 			throw new Error(`Cannot register two suites with the same name (${suite.name})`);

@@ -51,6 +51,11 @@ export class Database {
 		});
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Database';
+	}
+
+
 	destroy() {
 		this.dbReady.then(database => {
 			database.close();
@@ -62,6 +67,10 @@ export class Database {
 export class Direction {
 	static ASC = 'next';
 	static DESC = 'prev';
+
+	get [Symbol.toStringTag]() {
+		return 'Direction';
+	}
 }
 
 
@@ -75,6 +84,10 @@ class Store {
 		this.storeName = `${name}Store`;
 		this.config = config;
 		this.dbReady = dbReady;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'Store';
 	}
 
 	async add(obj) {
@@ -138,6 +151,10 @@ class Cursor {
 		this.dbReady = dbReady;
 		this.storeName = storeName;
 		this.field = field;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'Cursor';
 	}
 
 	getKeyRange() {

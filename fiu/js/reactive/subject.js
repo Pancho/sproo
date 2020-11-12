@@ -12,6 +12,10 @@ export class Subject extends Observable {
 		super();
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'Subject';
+	}
+
 	lift(operator) {
 		const subject = new AnonymousSubject(this, this);
 		subject.operator = operator;
@@ -102,6 +106,10 @@ export class AnonymousSubject extends Subject {
 		this.source = source;
 	}
 
+	get [Symbol.toStringTag]() {
+		return 'AnonymousSubject';
+	}
+
 	next(value) {
 		if (this.destination && this.destination.next) {
 			this.destination.next(value);
@@ -135,6 +143,10 @@ export class BehaviorSubject extends Subject {
 	constructor(value) {
 		super();
 		this._value = value;
+	}
+
+	get [Symbol.toStringTag]() {
+		return 'BehaviorSubject';
 	}
 
 	get value() {
