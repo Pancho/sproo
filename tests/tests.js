@@ -43,11 +43,11 @@ class Tests {
 				<h2>${suite.name}</h2>
 			</div>`),
 			control = Mavor.createElement(`<div class="control">
-				<p>Tests in suite: ${Object.entries(suite.tests).length}</p>
+				<p class="filter">Tests in suite: ${Object.entries(suite.tests).length}</p>
 				<p class="result-count">
-					<span class="successful"></span>
-					<span class="failed"></span>
-					<span class="exception"></span>
+					<span class="filter successful"></span>
+					<span class="filter failed"></span>
+					<span class="filter exception"></span>
 				</p>
 				<div class="progress">
 					<div class="progress-bar"></div>
@@ -61,7 +61,7 @@ class Tests {
 		this.main.append(content);
 
 		Object.entries(suite.tests).forEach(([slug, test]) => {
-			const listItem = Mavor.createElement(`<li>
+			const listItem = Mavor.createElement(`<li class="test">
 					<div>
 						<h3>${test.name}</h3>
 						<p class="result"></p>
@@ -79,6 +79,7 @@ class Tests {
 
 				selectedTest.run().then(() => {
 					reportPlaceholder.innerHTML = selectedTest.resultReport;
+					reportPlaceholder.setAttribute('title', Mavor.stripHTMLTags(selectedTest.resultReport));
 					resultPlaceholder.textContent = selectedTest.resultMessage;
 					if (selectedTest.succeeded) {
 						resultPlaceholder.classList.add('success');
@@ -131,6 +132,22 @@ class Tests {
 				});
 			});
 		});
+		control.querySelectorAll('.filter').forEach(filter => filter.addEventListener('click', ev => {
+			const target = ev.target,
+				listItems = content.querySelectorAll('.test');
+			let elements = content.querySelectorAll('.result');
+
+			if (target.classList.contains('successful')) {
+				elements = content.querySelectorAll('.result.success');
+			} else if (target.classList.contains('failed')) {
+				elements = content.querySelectorAll('.result.failed');
+			} else if (target.classList.contains('exception')) {
+				elements = content.querySelectorAll('.result.exception');
+			}
+
+			listItems.forEach(elm => elm.style.display = 'none');
+			elements.forEach(elm => elm.closest('.test').style.display = 'flex');
+		}));
 	}
 
 	setupContent(hash) {

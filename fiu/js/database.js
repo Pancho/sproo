@@ -5,6 +5,9 @@ export class Database {
 	dbReady;
 	version = 1;
 
+	static ORDER_ASC = 'next';
+	static ORDER_DESC = 'prev';
+
 	constructor(name, version, indexesConfig) {
 		this.name = name;
 
@@ -24,12 +27,26 @@ export class Database {
 					const database = ev.target.result;
 
 					Object.entries(indexesConfig).forEach(([storeName, storeConfig]) => {
-						if (!database.objectStoreNames.contains(`${storeName}Store`)) {
-							const objectStore = database.createObjectStore(`${storeName}Store`, storeConfig.options);
+						const fullStoreName = `${storeName}Store`;
+						if (!database.objectStoreNames.contains(fullStoreName)) {
+							const objectStore = database.createObjectStore(fullStoreName, storeConfig.options);
+							// Default or rather pk index (not implicit, as one might think...)
 							objectStore.createIndex(`${storeConfig.options.keyPath}Index`, storeConfig.options.keyPath, {unique: true});
 							Object.entries(storeConfig.indexedFields).forEach(([index, indexConfig]) => {
 								objectStore.createIndex(`${index}Index`, index, indexConfig);
 							});
+						} else {
+							if (!!storeConfig.upgrade) {
+								const objectStore = openRequest.transaction.objectStore(fullStoreName);
+								if (!!storeConfig.upgrade.delete) {
+									storeConfig.upgrade.delete.forEach(deleteIndex => objectStore.deleteIndex(`${deleteIndex}Index`));
+								}
+								if (!!storeConfig.upgrade.add) {
+									Object.entries(storeConfig.upgrade.add).forEach(
+										([index, indexConfig]) => objectStore.createIndex(`${index}Index`, index, indexConfig),
+									);
+								}
+							}
 						}
 					});
 				} catch (e) {
@@ -62,14 +79,11 @@ export class Database {
 			window.indexedDB.deleteDatabase(this.name);
 		});
 	}
-}
 
-export class Direction {
-	static ASC = 'next';
-	static DESC = 'prev';
-
-	get [Symbol.toStringTag]() {
-		return 'Direction';
+	close() {
+		this.dbReady.then(database => {
+			database.close();
+		});
 	}
 }
 
@@ -120,6 +134,15 @@ class Store {
 		});
 	}
 
+	async getIndexNames() {
+		return new Promise(async (resolve, reject) => {
+			const database = await this.dbReady,
+				transaction = database.transaction([this.storeName], 'readwrite'),
+				objectStore = transaction.objectStore(this.storeName);
+			resolve(objectStore.indexNames);
+		});
+	}
+
 	async count() {
 		const cursor = new Cursor(this.dbReady, this.storeName, this.config.options.keyPath);
 		return await cursor.count();
@@ -146,6 +169,8 @@ class Cursor {
 	lowerBounds;
 	lowerBoundsInclusive = false;
 	direction = 'next';
+	skipCount = 0;
+	limitCount = 0;
 
 	constructor(dbReady, storeName, field) {
 		this.dbReady = dbReady;
@@ -183,9 +208,18 @@ class Cursor {
 
 			cursorRequest.onsuccess = ev => {
 				const cursor = ev.target.result;
-				if (!!cursor) {
-					result.push(cursor.value);
-					cursor.continue();
+				if (!!cursor && !(this.limitCount > 0 && result.length === this.limitCount)) {
+					if (this.skipCount > 0) {
+						try {
+							cursor.advance(this.skipCount);
+						} catch (e) {
+							reject(ev);
+						}
+						this.skipCount = 0;
+					} else {
+						result.push(cursor.value);
+						cursor.continue();
+					}
 				} else {
 					resolve(result);
 				}
@@ -204,7 +238,15 @@ class Cursor {
 			cursorRequest.onsuccess = ev => {
 				const cursor = ev.target.result;
 				if (!!cursor) {
-					resolve(cursor.value);
+					if (this.skipCount > 0) {
+						try {
+							cursor.advance(this.skipCount);
+						} catch (e) {
+							reject(e);
+						}
+					} else {
+						resolve(cursor.value);
+					}
 				} else {
 					reject(ev);
 				}
@@ -226,6 +268,17 @@ class Cursor {
 		});
 	}
 
+
+	/**
+	 * This method will delete all records that your query has picked from the store.
+	 *
+	 * Delete ignores skip and limit. If you want to delete records, please make sure manually that the ones you want gone, are carefully
+	 * picked
+	 *
+	 * Once the deletion is done, you will get a boolean value if it was successful.
+	 *
+	 * @returns {Promise<boolean>}
+	 */
 	async delete() {
 		return new Promise(async (resolve, reject) => {
 			const database = await this.dbReady,
@@ -235,12 +288,16 @@ class Cursor {
 				cursorRequest = index.openCursor(this.getKeyRange(), this.direction);
 
 			cursorRequest.onsuccess = ev => {
-				const cursor = ev.target.result;
-				if (!!cursor) {
-					cursor.delete();
-					cursor.continue();
-				} else {
-					resolve(true);
+				try {
+					const cursor = ev.target.result;
+					if (!!cursor) {
+						cursor.delete();
+						cursor.continue();
+					} else {
+						resolve(true);
+					}
+				} catch (e) {
+					reject(false);
 				}
 			};
 		});
@@ -307,11 +364,15 @@ class Cursor {
 		return this;
 	}
 
-	// skip(count) {
-	// }
-	//
-	// limit(count) {
-	// }
+	skip(count) {
+		this.skipCount = count;
+		return this;
+	}
+
+	limit(count) {
+		this.limitCount = count;
+		return this;
+	}
 
 	order(direction) {
 		this.direction = direction;

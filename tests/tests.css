@@ -16,7 +16,7 @@ body {font-size:62.5%;font-family:'Roboto', sans-serif;display:flex;flex-directi
 
 /*font-family:'Roboto', sans-serif;*/
 /*font-family:'Source Code Pro', serif;*/
-main {display:flex;flex-direction:row;}
+main {display:flex;flex-direction:row;flex:0 0 100%;}
 
 nav {flex:0 0 200px;min-height:100vh;background-color:rgba(0,145,234,1.0);}
 nav div {margin:20px 20px 30px 20px;padding:0 0 20px 0;border-bottom:1px solid rgba(255,255,255,0.15);}
@@ -36,18 +36,18 @@ nav a:hover {padding:10px 20px 10px 30px;}
 .content .result-count .failed {color:rgba(244,67,54,1.0);}
 .content .result-count .exception {color:rgba(101,31,255,1.0);}
 
-.test-list {}
-.test-list li {display:flex;flex-direction:row;border-bottom:1px solid rgba(230,230,230,1.0);margin:0 0 10px 0;padding:0 0 10px 0;}
+.test-list {width:100%;}
+.test-list li {display:flex;border-bottom:1px solid rgba(230,230,230,1.0);margin:0 0 10px 0;padding:0 0 10px 0;}
 .test-list li:last-child {border-bottom:none;}
 .test-list li div {}
-.test-list li div:nth-child(1) {flex:1 0 auto;font-family:'Source Code Pro', serif;}
-.test-list li div:nth-child(2) {flex: 0 0  100px;}
+.test-list li div:nth-child(1) {flex:1 0 auto;display:flex;flex-direction:column;font-family:'Source Code Pro', serif;width:0;min-width:calc(100% - 100px);}
+.test-list li div:nth-child(2) {flex:0 0 100px;text-align:right;}
 .test-list li div h3 {font-size:14px;line-height:20px;}
 .test-list li div .result {margin:10px 0 0 20px;font-size:12px;line-height:16px;}
 .test-list li div .result.success {color:rgba(76,175,80,1.0);}
 .test-list li div .result.failed {color:rgba(244,67,54,1.0);}
 .test-list li div .result.exception {color:rgba(101,31,255,1.0);}
-.test-list li div .report {margin:10px 0 0 20px;font-size:12px;line-height:16px;}
+.test-list li div .report {margin:10px 0 0 20px;font-size:12px;line-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .test-list li div .report .value {font-weight:900;}
 .test-list li div .report .expected-value {font-weight:900;}
 .test-list li div .button {padding:2px 10px;}

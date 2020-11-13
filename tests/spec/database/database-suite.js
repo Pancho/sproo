@@ -8,7 +8,13 @@ import {
 	DatabaseCountTest,
 	DatabaseFilterCountTest,
 	DatabaseUpgradeTest,
-	DatabaseStoreAllTest
+	DatabaseStoreAllTest,
+	DatabaseOrderAscTest,
+	DatabaseOrderDescTest,
+	DatabaseSkipTest,
+	DatabaseLimitTest,
+	DatabaseSkipLimitTest,
+	DatabaseDeleteTest,
 } from './database.js';
 
 export class DatabaseSuite extends Suite {
@@ -23,5 +29,11 @@ export class DatabaseSuite extends Suite {
 		this.registerTest(new DatabaseFilterCountTest());
 		this.registerTest(new DatabaseUpgradeTest());
 		this.registerTest(new DatabaseStoreAllTest());
+		this.registerTest(new DatabaseOrderAscTest());
+		this.registerTest(new DatabaseOrderDescTest());
+		this.registerTest(new DatabaseSkipTest());
+		this.registerTest(new DatabaseLimitTest());
+		this.registerTest(new DatabaseSkipLimitTest());
+		this.registerTest(new DatabaseDeleteTest());
 	}
 }

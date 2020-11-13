@@ -18,10 +18,31 @@ const INDEXES = {
 			lastName: {
 				unique: false,
 			},
+			age: {
+				unique: false,
+			},
 			groups: {
 				unique: false,
 				multiEntry: true,
 			},
+		},
+	},
+};
+const INDEXES_UPGRADE = {
+	users: {
+		options: {
+			keyPath: 'id',
+			autoIncrement: true,
+		},
+		upgrade: {
+			delete: [
+				'age',
+			],
+			add: {
+				birthDate: {
+					unique: false,
+				}
+			}
 		},
 	},
 };
@@ -241,12 +262,19 @@ export class DatabaseUpgradeTest extends Test {
 		super('Database Upgrade Test', 'Database successfully upgraded', 'Could not upgrade the database');
 	}
 
+	async setup() {
+	}
+
 	async test() {
 		this.database = new Database('DatabaseUpgradeTest', 1, INDEXES);
-		await this.database.dbReady;
-		this.database = new Database('DatabaseUpgradeTest', 2, INDEXES);
-		const database = await this.database.dbReady;
-		return this.assertTruthy(database);
+		const oldIndexes = [...await this.database.users.getIndexNames()];
+		await this.database.close();
+		this.database = new Database('DatabaseUpgradeTest', 2, INDEXES_UPGRADE);
+		const newIndexes = [...await this.database.users.getIndexNames()];
+		return await this.assertTrue(
+			oldIndexes.includes('ageIndex') && !oldIndexes.includes('birthDateIndex') &&
+			!newIndexes.includes('ageIndex') && newIndexes.includes('birthDateIndex')
+		);
 
 	}
 
@@ -271,6 +299,147 @@ export class DatabaseStoreAllTest extends Test {
 	async test() {
 		const all = await this.database.users.all();
 		return this.assertEquals(all.length, INITIAL_DATA.length);
+	}
+
+	async teardown() {
+		this.database.destroy();
+	}
+}
+
+
+export class DatabaseOrderAscTest extends Test {
+	database;
+
+	constructor() {
+		super('Database Order Ascending Test', 'Data arrived in the correct order', 'Data did not arrive in the correct order');
+	}
+
+	async setup() {
+		this.database = new Database('DatabaseOrderAscTest', 1, INDEXES);
+		await Promise.all(INITIAL_DATA.map(async entry => await this.database.users.add(entry)));
+	}
+
+	async test() {
+		const all = await this.database.users.where('id').order(Database.ORDER_ASC).all(),
+			emails = all.map(entry => entry.email);
+		return this.assertArraysEquals(emails, INITIAL_DATA.map(entry => entry.email));
+	}
+
+	async teardown() {
+		this.database.destroy();
+	}
+}
+
+
+export class DatabaseOrderDescTest extends Test {
+	database;
+
+	constructor() {
+		super('Database Order Descending Test', 'Data arrived in the correct order', 'Data did not arrive in the correct order');
+	}
+
+	async setup() {
+		this.database = new Database('DatabaseOrderDescTest', 1, INDEXES);
+		await Promise.all(INITIAL_DATA.map(async entry => await this.database.users.add(entry)));
+	}
+
+	async test() {
+		const all = await this.database.users.where('id').order(Database.ORDER_DESC).all(),
+			emails = all.map(entry => entry.email);
+		return this.assertArraysEquals(emails, INITIAL_DATA.map(entry => entry.email).reverse());
+	}
+
+	async teardown() {
+		this.database.destroy();
+	}
+}
+
+
+export class DatabaseSkipTest extends Test {
+	database;
+
+	constructor() {
+		super('Database Skip Test', 'Data arrived in the correct order', 'Data did not arrive in the correct order');
+	}
+
+	async setup() {
+		this.database = new Database('DatabaseSkipTest', 1, INDEXES);
+		await Promise.all(INITIAL_DATA.map(async entry => await this.database.users.add(entry)));
+	}
+
+	async test() {
+		const all = await this.database.users.where('email').order(Database.ORDER_ASC).skip(2).all();
+		return this.assertArraysContentEquals(all.map(entry => entry.email), ['test3@test.com', 'test4@test.com', 'test5@test.com']);
+	}
+
+	async teardown() {
+		this.database.destroy();
+	}
+}
+
+
+export class DatabaseLimitTest extends Test {
+	database;
+
+	constructor() {
+		super('Database Limit Test', 'Data arrived in the correct order', 'Data did not arrive in the correct order');
+	}
+
+	async setup() {
+		this.database = new Database('DatabaseLimitTest', 1, INDEXES);
+		await Promise.all(INITIAL_DATA.map(async entry => await this.database.users.add(entry)));
+	}
+
+	async test() {
+		const all = await this.database.users.where('email').order(Database.ORDER_ASC).limit(2).all();
+		return this.assertArraysContentEquals(all.map(entry => entry.email), ['test1@test.com', 'test2@test.com']);
+	}
+
+	async teardown() {
+		this.database.destroy();
+	}
+}
+
+
+export class DatabaseSkipLimitTest extends Test {
+	database;
+
+	constructor() {
+		super('Database Skip Limit Test', 'Data arrived in the correct order', 'Data did not arrive in the correct order');
+	}
+
+	async setup() {
+		this.database = new Database('DatabaseSkipLimitTest', 1, INDEXES);
+		await Promise.all(INITIAL_DATA.map(async entry => await this.database.users.add(entry)));
+	}
+
+	async test() {
+		const all = await this.database.users.where('email').order(Database.ORDER_ASC).skip(2).limit(2).all();
+		return this.assertArraysContentEquals(all.map(entry => entry.email), ['test3@test.com', 'test4@test.com']);
+	}
+
+	async teardown() {
+		this.database.destroy();
+	}
+}
+
+
+export class DatabaseDeleteTest extends Test {
+	database;
+
+	constructor() {
+		super('Database Delete Test', 'Data successfully deleted', 'Data remains in the database');
+	}
+
+	async setup() {
+		this.database = new Database('DatabaseDeleteTest', 1, INDEXES);
+		await Promise.all(INITIAL_DATA.map(async entry => await this.database.users.add(entry)));
+	}
+
+	async test() {
+		await this.database.users.where('email').equals('test1@test.com').delete();
+		const all = await this.database.users.all();
+		return this.assertArraysContentEquals(all.map(entry => entry.email), ['test2@test.com', 'test3@test.com', 'test4@test.com', 'test5@test.com']);
 	}
 
 	async teardown() {

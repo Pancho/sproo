@@ -38,6 +38,35 @@ export class Test {
 		});
 	}
 
+	async assertArraysEquals(value, expectedValue) {
+		return new Promise((resolve, reject) => {
+			if (
+				Array.isArray(value) &&
+				Array.isArray(expectedValue) &&
+				value.length === expectedValue.length &&
+				value.every((val, index) => val === expectedValue[index])
+			) {
+				this.succeeded = true;
+				this.resultMessage = this.successMessage;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${value}"</span> equals <span class="expected-value">"${expectedValue}"</span>`;
+			} else {
+				this.failed = true;
+				this.resultMessage = this.failedMessage;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${value}"</span> does not equal <span class="expected-value">"${expectedValue}"</span>`;
+			}
+			resolve();
+		});
+	}
+
+	async assertArraysContentEquals(value, expectedValue) {
+		// The only difference between this method and the assertArraysEquals is that we don't care for the original order of elements
+		// and just check whether both have the same. So to use the same logic as in the assertArraysEquals, we just need to sort both
+		// arrays first, and the rest is the same.
+		value.sort();
+		expectedValue.sort();
+		return this.assertArraysEquals(value, expectedValue);
+	}
+
 	async assertNotEquals(value, expectedValue) {
 		return new Promise((resolve, reject) => {
 			if (value !== expectedValue) {

@@ -14,7 +14,7 @@ export class Suite {
 
 	registerTest(test) {
 		if (Mavor.slugify(test.name) in this.tests) {
-			throw new Error(`Cannot register two suites with the same name (${suite.name})`);
+			throw new Error(`Cannot register two suites with the same name (${test.name})`);
 		}
 		this.tests[Mavor.slugify(test.name)] = test;
 	}
