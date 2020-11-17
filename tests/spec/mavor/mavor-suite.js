@@ -1,11 +1,8 @@
 import { Suite } from '../../api/suite.js';
-import { MavorSlugifyNonASCIICharactersTest, MavorSlugifyTest, MavorSlugifyUnknownCharacterTest } from './mavor.js';
+import * as mavor from './mavor.js';
 
 export class MavorSuite extends Suite {
 	constructor() {
-		super('Mavor Suite');
-		this.registerTest(new MavorSlugifyTest());
-		this.registerTest(new MavorSlugifyNonASCIICharactersTest());
-		this.registerTest(new MavorSlugifyUnknownCharacterTest());
+		super('Mavor Suite', mavor);
 	}
 }

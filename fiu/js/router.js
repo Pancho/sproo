@@ -86,6 +86,8 @@ export class Router {
 	notFoundRoute = null;
 	destroyed = false;
 
+	static instance;
+
 	constructor(routeRoot, homePage, notFound, routes, authenticationUrl) {
 		if (!!Router.instance) {
 			throw new Error('Only one instance of Router allowed');
@@ -100,28 +102,21 @@ export class Router {
 		this.updatePageLinks();
 
 		this.homePageRoute = {
-			handler: (injections) => {
-				injections = injections || [];
-				RouterUtils.inject(new homePage.component(...injections));
-			},
+			handler: () => RouterUtils.inject(new homePage.component()),
 			hooks: homePage.hooks,
 		};
 		this.notFoundRoute = {
-			handler: (injections) => {
-				injections = injections || [];
-				RouterUtils.inject(new notFound.component(...injections));
-			},
+			handler: () => RouterUtils.inject(new notFound.component()),
 			hooks: notFound.hooks,
 		};
 
-		routes.forEach((route, index) => {
+		(routes || []).forEach((route, index) => {
 			this.on(
 				route.path,
-				(injections, params) => {
+				params => {
 					try {
-						injections = injections || [];
 						params = params || [];
-						RouterUtils.inject(new route.component(...injections, ...params));
+						RouterUtils.inject(new route.component(...params));
 					} catch (e) {
 						console.log('Check if you imported the declared your component in the app or in the child component');
 						throw e;
@@ -262,23 +257,29 @@ export class Router {
 			};
 
 			const handler = match.route.handler;
-			RouterUtils.manageHooks((injections) => {
+			RouterUtils.manageHooks(() => {
 				match.route.path instanceof RegExp ?
-					handler(injections, (match.match.slice(1, match.match.length))) :
-					handler(injections, match.params);
+					handler((match.match.slice(1, match.match.length))) :
+					handler(match.params);
 			}, match.route.hooks, match.params);
 			return match;
 		} else if (!!this.homePageRoute && (path === '' || path === '/')) {
-			RouterUtils.manageHooks((injections) => {
+			RouterUtils.manageHooks(() => {
 				this.callLeave();
-				this.lastRouteResolved = {path: path, hooks: this.homePageRoute.hooks};
-				this.homePageRoute.handler(injections);
+				this.lastRouteResolved = {
+					path: path,
+					hooks: this.homePageRoute.hooks,
+				};
+				this.homePageRoute.handler();
 			}, this.homePageRoute.hooks);
 		} else if (!!this.notFoundRoute) {
-			RouterUtils.manageHooks((injections) => {
+			RouterUtils.manageHooks(() => {
 				this.callLeave();
-				this.lastRouteResolved = {path: path, hooks: this.notFoundRoute.hooks};
-				this.notFoundRoute.handler(injections);
+				this.lastRouteResolved = {
+					path: path,
+					hooks: this.notFoundRoute.hooks,
+				};
+				this.notFoundRoute.handler();
 			}, this.notFoundRoute.hooks);
 		}
 		return false;
@@ -320,7 +321,10 @@ class RouterUtils {
 					.replace(RouterUtils.WILDCARD_REGEXP, RouterUtils.REPLACE_WILDCARD) + RouterUtils.FOLLOWED_BY_SLASH_REGEXP,
 			);
 		}
-		return {regexp, paramNames};
+		return {
+			regexp,
+			paramNames,
+		};
 	}
 
 	static regExpResultToParams(match, names) {
@@ -344,29 +348,25 @@ class RouterUtils {
 	}
 
 	static manageHooks(handler, hooks, params) {
-		let injections = [];
 		if (!!hooks && typeof hooks === 'object') {
-			if (!!hooks.injections) {
-				injections = hooks.injections(params);
-			}
 			if (!!hooks.before) {
 				hooks.before((shouldRoute = true) => {
 					if (!shouldRoute) {
 						return;
 					}
-					handler(injections);
+					handler();
 					if (!!hooks.after) {
 						hooks.after(params);
 					}
 				}, params);
 				return;
 			} else if (!!hooks.after) {
-				handler(injections);
+				handler();
 				hooks.after(params);
 				return;
 			}
 		}
-		handler(injections);
+		handler();
 	}
 
 	static getUrlDepth(url) {
@@ -379,6 +379,11 @@ class RouterUtils {
 
 	static inject(component) {
 		const outlet = document.querySelector('router-outlet');
+
+		if (!outlet) {
+			throw new Error('Page must contain <router-outlet> element');
+		}
+
 		while (outlet.firstChild) {
 			if (outlet.firstChild.unload) {
 				outlet.firstChild.unload();

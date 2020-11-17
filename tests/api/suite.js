@@ -4,8 +4,16 @@ export class Suite {
 	name;
 	tests = {};
 
-	constructor(name) {
+	constructor(name, ...modules) {
 		this.name = name;
+		modules.forEach(module => {
+			Object.values(module)
+				.sort()
+				.filter(clazz => clazz.name.endsWith('Test'))
+				.forEach(clazz => {
+					this.registerTest(new clazz());
+				});
+		});
 	}
 
 	get [Symbol.toStringTag]() {
@@ -17,10 +25,6 @@ export class Suite {
 			throw new Error(`Cannot register two suites with the same name (${test.name})`);
 		}
 		this.tests[Mavor.slugify(test.name)] = test;
-	}
-
-	executeSuite() {
-		Object.values(this.tests).forEach(test => test.run());
 	}
 
 	teardown() {

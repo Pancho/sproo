@@ -75,21 +75,4 @@ export class Utils {
 			});
 		}
 	}
-
-	static uuid() {
-		return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function (c) {
-			return (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16);
-		});
-	}
-
-	static kebabToCamel(string) {
-		return string.split('-').map((item, index) => index ? item.charAt(0).toUpperCase() + item.slice(1).toLowerCase() : item.toLowerCase()).join('');
-	}
-
-	static camelToKebab(string) {
-		return string
-			.replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-			.replace(/([A-Z])([A-Z])(?=[a-z])/g, '$1-$2')
-			.toLowerCase();
-	}
 }

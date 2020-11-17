@@ -39,7 +39,6 @@ export class DemoPageComponent extends Component {
 		// 	}),
 		// 	takeUntil(this.unsubscribe),
 		// ).subscribe();
-		this.logger.log('DemoPageComponent constructor finished')();
 	}
 
 	unload() {

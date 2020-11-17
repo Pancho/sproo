@@ -48,7 +48,9 @@ export class App {
 			setTimeout(() => {
 				if (!!config.rootComponents) {
 					config.rootComponents.forEach((component) => {
-						customElements.define(component.tagName, component);
+						if (!customElements.get(component.tagName)) {
+							customElements.define(component.tagName, component);
+						}
 					});
 				}
 
@@ -66,9 +68,13 @@ export class App {
 					authentication = new Authentication();
 				}
 
-				this.http = new Http(config.httpEndpointStub, authentication);
+				if (!!config.httpEndpointStub) {
+					this.http = new Http(config.httpEndpointStub, authentication);
+				}
 
-				config.onAppReady.forEach(fn => fn());
+				if (Array.isArray(config.onAppReady)) {
+					config.onAppReady.forEach(fn => fn(this));
+				}
 
 				resolve(this);
 			});
@@ -89,11 +95,17 @@ export class App {
 		}
 		if (!!config.useFactory) {
 			App.injectionRegistry[key].push(function () {
-				return {name, entity: config.useFactory(...config.params)};
+				return {
+					name,
+					entity: config.useFactory(...config.params),
+				};
 			});
 		} else if (!!config.useClass) {
 			App.injectionRegistry[key].push(function () {
-				return {name, entity: new config.useClass(...config.params)};
+				return {
+					name,
+					entity: new config.useClass(...config.params),
+				};
 			});
 		}
 	}

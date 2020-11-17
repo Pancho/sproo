@@ -10,9 +10,4 @@ export class EmptyPageComponent extends Component {
 	];
 	static registerComponents = [
 	];
-
-	constructor(store, paramTest) {
-		super();
-		this.logger.log('EmptyPageComponent constructor finished')();
-	}
 }

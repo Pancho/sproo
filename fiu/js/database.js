@@ -35,6 +35,11 @@ export class Database {
 							Object.entries(storeConfig.indexedFields).forEach(([index, indexConfig]) => {
 								objectStore.createIndex(`${index}Index`, index, indexConfig);
 							});
+							storeConfig.composites.forEach(composite => {
+								const compositeIndexName = [composite.fields[0], ...composite.fields.slice(1)
+									.reduce((acc, cur) => `${acc}${cur.charAt(0).toUpperCase() + cur.slice(1)}`, '')].join('');
+								objectStore.createIndex(`${compositeIndexName}Index`, composite.fields, composite.config);
+							});
 						} else {
 							if (!!storeConfig.upgrade) {
 								const objectStore = openRequest.transaction.objectStore(fullStoreName);
@@ -44,6 +49,15 @@ export class Database {
 								if (!!storeConfig.upgrade.add) {
 									Object.entries(storeConfig.upgrade.add).forEach(
 										([index, indexConfig]) => objectStore.createIndex(`${index}Index`, index, indexConfig),
+									);
+								}
+								if (!!storeConfig.upgrade.addComposites) {
+									storeConfig.upgrade.addComposites.forEach(
+										composite => {
+											const compositeIndexName = [composite.fields[0], ...composite.fields.slice(1)
+												.reduce((acc, cur) => `${acc}${cur.charAt(0).toUpperCase() + cur.slice(1)}`, '')].join('');
+											objectStore.createIndex(`${compositeIndexName}Index`, composite.fields, composite.config);
+										},
 									);
 								}
 							}

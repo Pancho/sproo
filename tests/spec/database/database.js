@@ -26,6 +26,14 @@ const INDEXES = {
 				multiEntry: true,
 			},
 		},
+		composites: [
+			{
+				fields: ['firstName', 'lastName'],
+				config: {
+					unique: false
+				}
+			}
+		]
 	},
 };
 const INDEXES_UPGRADE = {
@@ -37,12 +45,21 @@ const INDEXES_UPGRADE = {
 		upgrade: {
 			delete: [
 				'age',
+				'firstNameLastName',
 			],
 			add: {
 				birthDate: {
 					unique: false,
 				}
-			}
+			},
+			addComposites: [
+				{
+					fields: ['email', 'firstName'],
+					config: {
+						unique: true
+					}
+				}
+			]
 		},
 	},
 };
@@ -271,9 +288,11 @@ export class DatabaseUpgradeTest extends Test {
 		await this.database.close();
 		this.database = new Database('DatabaseUpgradeTest', 2, INDEXES_UPGRADE);
 		const newIndexes = [...await this.database.users.getIndexNames()];
-		return await this.assertTrue(
-			oldIndexes.includes('ageIndex') && !oldIndexes.includes('birthDateIndex') &&
-			!newIndexes.includes('ageIndex') && newIndexes.includes('birthDateIndex')
+		await this.assertTrue(
+			oldIndexes.includes('ageIndex') && oldIndexes.includes('firstNameLastNameIndex') &&
+				!oldIndexes.includes('birthDateIndex')  && !oldIndexes.includes('emailFirstNameIndex') &&
+			!newIndexes.includes('ageIndex') && !newIndexes.includes('firstNameLastNameIndex') &&
+				newIndexes.includes('birthDateIndex') && newIndexes.includes('emailFirstNameIndex')
 		);
 
 	}

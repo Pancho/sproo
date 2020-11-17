@@ -1,6 +1,8 @@
 import { Mavor } from '../fiu/js/mavor.js';
 import { Manager } from './api/manager.js';
 import { DatabaseSuite } from './spec/database/database-suite.js';
+import { FiuAppSuite } from './spec/fiu-app/fiu-app-suite.js';
+import { FiuComponentSuite } from './spec/fiu-component/fiu-component-suite.js';
 import { MavorSuite } from './spec/mavor/mavor-suite.js';
 
 class Tests {
@@ -11,6 +13,8 @@ class Tests {
 	constructor() {
 		this.manager.addSuite(new MavorSuite());
 		this.manager.addSuite(new DatabaseSuite());
+		this.manager.addSuite(new FiuAppSuite());
+		this.manager.addSuite(new FiuComponentSuite());
 		this.initNavigation();
 	}
 
@@ -55,13 +59,14 @@ class Tests {
 				<a class="button run-suite">Run All Tests</a>
 			</div>`),
 			testList = Mavor.createElement(`<ol class="test-list"></ol>`);
+		let testRunning = false;
 
 		content.append(control);
 		content.append(testList);
 		this.main.append(content);
 
 		Object.entries(suite.tests).forEach(([slug, test]) => {
-			const listItem = Mavor.createElement(`<li class="test">
+			const listItem = Mavor.createElement(`<li class="test" id="${slug}">
 					<div>
 						<h3>${test.name}</h3>
 						<p class="result"></p>
@@ -97,20 +102,22 @@ class Tests {
 
 		control.querySelector('.run-suite').addEventListener('click', ev => {
 			const listItems = testList.querySelectorAll('li'),
-				step = 100 / listItems.length;
-			let percentage = 0,
-				successful = 0,
-				failed = 0,
-				exception = 0;
+				step = 100 / listItems.length,
+				renderItem = async (listItem) => {
+					if (!testRunning) {
+						testRunning = true;
+					} else {
+						setTimeout(() => {
+							renderItem(listItem);
+						}, Math.random() * 100);
+						return;
+					}
 
-			ev.preventDefault();
-			control.querySelector('.result-count').style.display = 'none';
-			testList.querySelectorAll('li').forEach(listItem => {
-				const selectedTest = suite.tests[listItem.dataset.slug],
-					resultPlaceholder = listItem.querySelector('.result'),
-					reportPlaceholder = listItem.querySelector('.report');
+					const selectedTest = suite.tests[listItem.dataset.slug],
+						resultPlaceholder = listItem.querySelector('.result'),
+						reportPlaceholder = listItem.querySelector('.report');
 
-				selectedTest.run().then(() => {
+					await selectedTest.run();
 					reportPlaceholder.innerHTML = selectedTest.resultReport;
 					resultPlaceholder.textContent = selectedTest.resultMessage;
 					if (selectedTest.succeeded) {
@@ -129,8 +136,17 @@ class Tests {
 					control.querySelector('.failed').textContent = `Failed: ${failed}`;
 					control.querySelector('.exception').textContent = `Exception: ${exception}`;
 					control.querySelector('.result-count').style.display = 'block';
-				});
-			});
+					testRunning = false;
+				};
+			let percentage = 0,
+				successful = 0,
+				failed = 0,
+				exception = 0;
+
+			ev.preventDefault();
+			control.querySelector('.result-count').style.display = 'none';
+
+			testList.querySelectorAll('li').forEach(renderItem);
 		});
 		control.querySelectorAll('.filter').forEach(filter => filter.addEventListener('click', ev => {
 			const target = ev.target,

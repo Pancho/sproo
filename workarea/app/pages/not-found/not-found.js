@@ -9,9 +9,4 @@ export class NotFoundComponent extends Component {
 		'/fiu/css/normalize',
 		'/app/pages/not-found/not-found',
 	];
-
-	constructor() {
-		super();
-		this.logger.log('NotFoundComponent constructor finished')();
-	}
 }

@@ -150,9 +150,6 @@ import { App } from './app.js';
 import { Utils } from './utils.js';
 
 export class Component extends HTMLElement {
-	// Registered components, a registry of sorts, but in reality it's just a plain ole list
-	static registeredComponents = [];
-
 	// This property tells whether this component has been removed from the host document
 	unloaded = false;
 
@@ -168,6 +165,8 @@ export class Component extends HTMLElement {
 	*/
 	constructor() {
 		super();
+
+		this.test = Math.random();
 
 		// Template context, from which the template gets updated
 		this.templateContext = {};
@@ -186,8 +185,8 @@ export class Component extends HTMLElement {
 		}
 
 		const injections = App.inject(this.constructor);
-		Object.keys(injections).forEach((propertyName) => {
-			this[propertyName] = injections[propertyName];
+		Object.entries(injections).forEach(([propertyName, injection]) => {
+			this[propertyName] = injection;
 		});
 		if (!!App.loggerFactory) {
 			this.logger = App.loggerFactory.getLogger(this.constructor);
@@ -195,9 +194,8 @@ export class Component extends HTMLElement {
 
 		if (!!this.constructor.registerComponents) {
 			this.constructor.registerComponents.forEach((component) => {
-				if (Component.registeredComponents.indexOf(component) === -1) {  // Should not load twice, right
+				if (!customElements.get(component.tagName)) {  // Should not load twice, right
 					customElements.define(component.tagName, component);
-					Component.registeredComponents.push(component);
 				}
 				Object.keys(injections).forEach((propertyName) => {
 					component.prototype[propertyName] = injections[propertyName];

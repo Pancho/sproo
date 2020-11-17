@@ -1,3 +1,10 @@
+import { App } from '../../fiu/js/app.js';
+import { Authentication } from '../../fiu/js/authentication.js';
+import { Http } from '../../fiu/js/http.js';
+import { Mavor } from '../../fiu/js/mavor.js';
+import { Router } from '../../fiu/js/router.js';
+
+
 export class Test {
 	name;
 	successMessage;
@@ -7,16 +14,14 @@ export class Test {
 	succeeded = false;
 	failed = false;
 	exception = false;
-	doc;
 
-	constructor(name, successMessage, failedMessage, doc) {
+	constructor(name, successMessage, failedMessage) {
 		this.name = name;
 		if (successMessage === failedMessage) {
 			throw new Error('Test cannot have same message for success and fail.');
 		}
 		this.successMessage = successMessage;
 		this.failedMessage = failedMessage;
-		this.doc = doc;
 	}
 
 	get [Symbol.toStringTag]() {
@@ -228,6 +233,7 @@ export class Test {
 			console.error(e);
 		}
 		await this.teardown();
+		return true;
 	}
 
 	isExecuted() {
@@ -242,5 +248,66 @@ export class Test {
 	}
 
 	async teardown() {
+	}
+}
+
+
+export class AppTest extends Test {
+	config;
+	awaitApp;
+	url;
+	app;
+	routerOutlet;
+
+	constructor(name, successMessage, failedMessage, config, awaitApp) {
+		super(name, successMessage, failedMessage);
+		this.config = config;
+		this.awaitApp = !!awaitApp;
+	}
+
+	async setup() {
+		this.url = window.location.href;
+		this.routerOutlet = Mavor.createElement('<router-outlet></router-outlet>');
+		document.querySelector('body main').appendChild(this.routerOutlet);
+		this.app = new App(this.config);
+		if (this.awaitApp) {
+			await App.appReady;
+		}
+	}
+
+	async teardown() {
+		window.history.pushState(
+			{},
+			'',
+			this.url,
+		);
+		document.querySelector('body main').removeChild(this.routerOutlet);
+		App.instance = null;
+		App.injectionRegistry = {};
+		Router.instance = null;
+		Authentication.instance = null;
+		Http.instance = null;
+	}
+
+	click(doc, x, y) {
+		const mouseClickEvent = document.createEvent('MouseEvents');
+		mouseClickEvent.initMouseEvent(
+			'click',
+			true,
+			true,
+			window,
+			0,
+			x,
+			y,
+			x,
+			y,
+			false,
+			false,
+			false,
+			false,
+			0,
+			null,
+		);
+		doc.elementFromPoint(x, y).dispatchEvent(mouseClickEvent);
 	}
 }

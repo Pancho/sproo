@@ -27,7 +27,7 @@ nav a:hover {padding:10px 20px 10px 30px;}
 .content {flex:1 0 auto;margin:10px;padding:20px;border:1px solid rgba(200,200,200,1.0);background-color:rgba(255,255,255,1.0);box-shadow: 0 0 5px 3px rgba(255,255,255,0.75);}
 .content h2 {font-size:20px;line-height:1;font-weight:500;}
 .content .control {margin:10px 0;padding:0 0 10px 0;}
-.content .control p {font-size:14px;line-height:20px;}
+.content .control p {font-size:14px;line-height:20px;cursor:pointer;}
 .content .control .progress {margin:10px 0;border:1px solid rgba(230,230,230,1.0);position:relative;height:8px;}
 .content .control .progress .progress-bar {position:absolute;background-color:rgba(76,175,80,1.0);height:8px;top:0;left:0;}
 .content .result-count {margin:10px 0 0 20px;font-size:12px;line-height:16px;display:none;}
@@ -54,32 +54,4 @@ nav a:hover {padding:10px 20px 10px 30px;}
 
 .button {display:inline-block;font-size:14px;line-height:20px;border-radius:3px;padding:5px 20px;background-color:rgba(0,145,234,1.0);color:rgba(255,255,255,1.0);cursor:pointer;}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+body main router-outlet {position:fixed;left:0;right:0;}

@@ -161,6 +161,12 @@ export class Mavor {
 		return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 	}
 
+	static camelize(text, separator = '-') {
+		text
+			.split(separator)
+			.reduce((acc, cur) => `${acc}${cur.charAt(0).toUpperCase() + cur.slice(1)}`, '');
+	}
+
 	static slugify(text) {
 		return text
 			.toString()
@@ -171,6 +177,17 @@ export class Mavor {
 			.replace(/\s+/g, '-')
 			.replace(/[^\w-]+/g, '')
 			.replace(/--+/g, '-');
+	}
+
+	static kebabToCamel(string) {
+		return string.split('-').map((item, index) => index ? item.charAt(0).toUpperCase() + item.slice(1).toLowerCase() : item.toLowerCase()).join('');
+	}
+
+	static camelToKebab(string) {
+		return string
+			.replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+			.replace(/([A-Z])([A-Z])(?=[a-z])/g, '$1-$2')
+			.toLowerCase();
 	}
 
 	static elementContains(parent, child) {
