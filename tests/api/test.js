@@ -284,6 +284,7 @@ export class AppTest extends Test {
 		document.querySelector('body main').removeChild(this.routerOutlet);
 		App.instance = null;
 		App.injectionRegistry = {};
+		Router.instance.destroy();
 		Router.instance = null;
 		Authentication.instance = null;
 		Http.instance = null;

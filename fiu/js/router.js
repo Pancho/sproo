@@ -98,7 +98,7 @@ export class Router {
 		this.routeRoot = routeRoot;
 		this.authenticationUrl = authenticationUrl;
 
-		window.addEventListener('popstate', () => this.resolve());
+		window.addEventListener('popstate', this.resolve);
 		this.updatePageLinks();
 
 		this.homePageRoute = {
