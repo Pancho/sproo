@@ -5,9 +5,9 @@
 			<a route="/empty">To Empty</a>
 			<a route="/empty/test">To Empty Test</a>
 			<div fiu-ref="paragraphContainer">
-				<p [textContent]="blah"></p>
+				<p [text-content]="blah"></p>
 			</div>
-			<child-component [coords]="coords"></child-component>
+			<child-component [coords]="coords" (values-updated)="notifyValuesUpdated"></child-component>
 		</div>
 	</main>
 </template>

@@ -6,7 +6,7 @@ export class Utils {
 	static domParser = new DOMParser();
 	// Common property names mapping
 	static propertyNamesMap = {
-		'textcontent': 'textContent',
+		'text-content': 'textContent',
 	}
 
 	static applyCss(stylesheet, shadowRoot, resolve) {

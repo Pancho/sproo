@@ -5,9 +5,10 @@ export class ChildComponent extends Component {
 	static template = '/app/components/child-component/child-component';
 	static stylesheets = [];
 
-	set coords (coords) {
+	set coords(coords) {
+		this.dispatchEvent(new CustomEvent('values-updated', coords));
 		this.context = {
 			coords: coords,
-		}
+		};
 	}
 }

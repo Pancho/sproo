@@ -25,6 +25,7 @@ export class DemoPageComponent extends Component {
 	];
 
 	unsubscribe = new Subject();
+	valuesUpdated = false;
 
 	constructor() {
 		super();
@@ -72,5 +73,9 @@ export class DemoPageComponent extends Component {
 				y: ev.screenY,
 			},
 		};
+	}
+
+	notifyValuesUpdated(ev) {
+		this.valuesUpdated = true;
 	}
 }

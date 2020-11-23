@@ -166,8 +166,6 @@ export class Component extends HTMLElement {
 	constructor() {
 		super();
 
-		this.test = Math.random();
-
 		// Template context, from which the template gets updated
 		this.templateContext = {};
 

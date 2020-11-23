@@ -22,6 +22,7 @@ class Tests {
 		Object.entries(this.manager.suites).forEach(([slug, suite]) => {
 			this.nav.append(Mavor.createElement(`<a href="#${slug}">${suite.name}</a>`));
 		});
+		this.nav.append(Mavor.createElement(`<a href="#all-tests">All Tests</a>`));
 
 		this.nav.addEventListener('click', ev => {
 			const target = ev.target.getAttribute('href');
@@ -42,12 +43,14 @@ class Tests {
 		document.querySelectorAll('.content').forEach(content => content.parentElement.removeChild(content));
 	}
 
-	getNewContent(suite) {
-		const content = Mavor.createElement(`<div class="content">
-				<h2>${suite.name}</h2>
+	getNewContent(...suites) {
+		const allTests = suites.reduce((prev, next) => ({...prev, ...next.tests}), {}),
+			suiteNames = suites.map(suite => suite.name),
+			content = Mavor.createElement(`<div class="content">
+				<h2>${suiteNames.join(', ')}</h2>
 			</div>`),
 			control = Mavor.createElement(`<div class="control">
-				<p class="filter">Tests in suite: ${Object.entries(suite.tests).length}</p>
+				<p class="filter">Tests in suite: ${Object.keys(allTests).length}</p>
 				<p class="result-count">
 					<span class="filter successful"></span>
 					<span class="filter failed"></span>
@@ -65,7 +68,7 @@ class Tests {
 		content.append(testList);
 		this.main.append(content);
 
-		Object.entries(suite.tests).forEach(([slug, test]) => {
+		Object.entries(allTests).forEach(([slug, test]) => {
 			const listItem = Mavor.createElement(`<li class="test" id="${slug}">
 					<div>
 						<h3>${test.name}</h3>
@@ -78,7 +81,7 @@ class Tests {
 				</li>`);
 
 			listItem.querySelector('.run-test').addEventListener('click', ev => {
-				const selectedTest = suite.tests[slug],
+				const selectedTest = allTests[slug],
 					resultPlaceholder = ev.target.closest('li').querySelector('.result'),
 					reportPlaceholder = ev.target.closest('li').querySelector('.report');
 
@@ -113,7 +116,7 @@ class Tests {
 						return;
 					}
 
-					const selectedTest = suite.tests[listItem.dataset.slug],
+					const selectedTest = allTests[listItem.dataset.slug],
 						resultPlaceholder = listItem.querySelector('.result'),
 						reportPlaceholder = listItem.querySelector('.report');
 
@@ -168,7 +171,11 @@ class Tests {
 
 	setupContent(hash) {
 		this.removeExistingContent();
-		this.getNewContent(this.manager.getSuiteBySlug(hash.replace('#', '')));
+		if (hash === '#all-tests') {
+			this.getNewContent(...Object.values(this.manager.suites));
+		} else {
+			this.getNewContent(this.manager.getSuiteBySlug(hash.replace('#', '')));
+		}
 	}
 }
 
