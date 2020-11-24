@@ -18,6 +18,9 @@ const INDEXES = {
 			lastName: {
 				unique: false,
 			},
+			order: {
+				unique: false,
+			},
 			age: {
 				unique: false,
 			},
@@ -30,10 +33,10 @@ const INDEXES = {
 			{
 				fields: ['firstName', 'lastName'],
 				config: {
-					unique: false
-				}
-			}
-		]
+					unique: false,
+				},
+			},
+		],
 	},
 };
 const INDEXES_UPGRADE = {
@@ -50,16 +53,16 @@ const INDEXES_UPGRADE = {
 			add: {
 				birthDate: {
 					unique: false,
-				}
+				},
 			},
 			addComposites: [
 				{
 					fields: ['email', 'firstName'],
 					config: {
-						unique: true
-					}
-				}
-			]
+						unique: true,
+					},
+				},
+			],
 		},
 	},
 };
@@ -68,30 +71,35 @@ const INITIAL_DATA = [
 		email: 'test1@test.com',
 		firstName: 'Tester',
 		lastName: 'Testoff',
+		order: 1,
 		groups: ['admin', 'tester'],
 	},
 	{
 		email: 'test2@test.com',
 		firstName: 'Tester',
 		lastName: 'Testoff',
+		order: 2,
 		groups: ['admin', 'tester'],
 	},
 	{
 		email: 'test3@test.com',
 		firstName: 'Tester',
 		lastName: 'Testoff',
+		order: 3,
 		groups: ['admin', 'tester'],
 	},
 	{
 		email: 'test4@test.com',
 		firstName: 'Tester',
 		lastName: 'Testoff',
+		order: 4,
 		groups: ['admin', 'tester'],
 	},
 	{
 		email: 'test5@test.com',
 		firstName: 'Tester',
 		lastName: 'Testoff',
+		order: 5,
 		groups: ['admin', 'tester'],
 	},
 ];
@@ -262,7 +270,7 @@ export class DatabaseFilterCountTest extends Test {
 	}
 
 	async test() {
-		const count = await this.database.users.where('id').betweenInclusive(1, 3).count();
+		const count = await this.database.users.where('order').betweenInclusive(1, 3).count();
 		return this.assertEquals(count, 3);
 	}
 
@@ -290,9 +298,9 @@ export class DatabaseUpgradeTest extends Test {
 		const newIndexes = [...await this.database.users.getIndexNames()];
 		await this.assertTrue(
 			oldIndexes.includes('ageIndex') && oldIndexes.includes('firstNameLastNameIndex') &&
-				!oldIndexes.includes('birthDateIndex')  && !oldIndexes.includes('emailFirstNameIndex') &&
+			!oldIndexes.includes('birthDateIndex') && !oldIndexes.includes('emailFirstNameIndex') &&
 			!newIndexes.includes('ageIndex') && !newIndexes.includes('firstNameLastNameIndex') &&
-				newIndexes.includes('birthDateIndex') && newIndexes.includes('emailFirstNameIndex')
+			newIndexes.includes('birthDateIndex') && newIndexes.includes('emailFirstNameIndex'),
 		);
 
 	}
@@ -459,6 +467,29 @@ export class DatabaseDeleteTest extends Test {
 		await this.database.users.where('email').equals('test1@test.com').delete();
 		const all = await this.database.users.all();
 		return this.assertArraysContentEquals(all.map(entry => entry.email), ['test2@test.com', 'test3@test.com', 'test4@test.com', 'test5@test.com']);
+	}
+
+	async teardown() {
+		this.database.destroy();
+	}
+}
+
+
+export class DatabaseDistinctTest extends Test {
+	database;
+
+	constructor() {
+		super('Database Distinct Test', 'Distinct values delivered', 'Duplicate values found in the result');
+	}
+
+	async setup() {
+		this.database = new Database('DatabaseDistinctTest', 1, INDEXES);
+		await Promise.all(INITIAL_DATA.map(async entry => await this.database.users.add(entry)));
+	}
+
+	async test() {
+		const all = await this.database.users.where('firstName').distinct().all()
+		return this.assertArraysContentEquals(all.map(entry => entry.email), ['test1@test.com']);
 	}
 
 	async teardown() {

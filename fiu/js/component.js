@@ -1,5 +1,6 @@
 'use strict';
 import { App } from './app.js';
+import { Utils } from './utils.js';
 /* I wanted to have this "middleman", due to JS not supporting real decorators yet, to avoid boilerplate in the actual
 * component/element class implementation. I insist on not using babels and some obscure pollyfills, to achieve decorator like effect,
 * both of which require one quarter of npm dependencies to produce sub-par, bloated, unreadable cesspool of JS code in the end (let's
@@ -147,7 +148,6 @@ import { App } from './app.js';
 * 	} // You may omit the constructor alltogether
 * }
 */
-import { Utils } from './utils.js';
 
 export class Component extends HTMLElement {
 	// This property tells whether this component has been removed from the host document
@@ -388,5 +388,34 @@ export class Component extends HTMLElement {
 
 	static isObject(obj) {
 		return Object.prototype.toString.call(obj) === '[object Object]';
+	}
+}
+
+
+class Static {
+	content = '';
+
+	constructor(content) {
+		this.content = content;
+	}
+
+	asString() {
+		return this.content;
+	}
+}
+
+
+export class HTMLTemplate extends Static {
+	asDocument() {
+		return Utils.domParser.parseFromString(this.content, 'text/html');
+	}
+}
+
+
+export class CSSTemplate extends Static {
+	asStyleSheet() {
+		const styleSheet = new CSSStyleSheet();
+		styleSheet.replaceSync(this.content);
+		return styleSheet;
 	}
 }
