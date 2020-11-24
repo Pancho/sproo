@@ -185,6 +185,7 @@ class Cursor {
 	direction = 'next';
 	skipCount = 0;
 	limitCount = 0;
+	useDistinct = false;
 
 	constructor(dbReady, storeName, field) {
 		this.dbReady = dbReady;
@@ -197,7 +198,7 @@ class Cursor {
 	}
 
 	getKeyRange() {
-		let keyRange = null;
+		let keyRange = undefined;
 		if (!!this.exact) {
 			keyRange = IDBKeyRange.only(this.exact);
 		} else if (!!this.upperBounds && !this.lowerBounds) {
@@ -210,15 +211,29 @@ class Cursor {
 		return keyRange;
 	}
 
+	getDirectionParameter() {
+		if (!!this.useDistinct) {
+			return `${this.direction}unique`;
+		} else {
+			return this.direction;
+		}
+	}
+
 	async all() {
 		const result = [];
 
 		return new Promise(async (resolve, reject) => {
 			const database = await this.dbReady,
 				transaction = database.transaction([this.storeName], 'readwrite'),
-				objectStore = transaction.objectStore(this.storeName),
-				index = objectStore.index(`${this.field}Index`),
-				cursorRequest = index.openCursor(this.getKeyRange(), this.direction);
+				objectStore = transaction.objectStore(this.storeName);
+
+			let cursorRequest = null;
+
+			if (objectStore.keyPath === this.field) {
+				cursorRequest = objectStore.openCursor(this.getKeyRange(), this.getDirectionParameter());
+			} else {
+				cursorRequest = objectStore.index(`${this.field}Index`).openCursor(this.getKeyRange(), this.getDirectionParameter());
+			}
 
 			cursorRequest.onsuccess = ev => {
 				const cursor = ev.target.result;
@@ -247,7 +262,7 @@ class Cursor {
 				transaction = database.transaction([this.storeName], 'readwrite'),
 				objectStore = transaction.objectStore(this.storeName),
 				index = objectStore.index(`${this.field}Index`),
-				cursorRequest = index.openCursor(this.getKeyRange(), this.direction);
+				cursorRequest = index.openCursor(this.getKeyRange(), this.getDirectionParameter());
 
 			cursorRequest.onsuccess = ev => {
 				const cursor = ev.target.result;
@@ -272,10 +287,15 @@ class Cursor {
 		return new Promise(async (resolve, reject) => {
 			const database = await this.dbReady,
 				transaction = database.transaction([this.storeName], 'readwrite'),
-				objectStore = transaction.objectStore(this.storeName),
-				index = objectStore.index(`${this.field}Index`),
-				cursorRequest = index.count(this.getKeyRange());
+				objectStore = transaction.objectStore(this.storeName);
 
+			let cursorRequest = null;
+
+			if (objectStore.keyPath === this.field) {
+				cursorRequest = objectStore.count(this.getKeyRange());
+			} else {
+				cursorRequest = objectStore.index(`${this.field}Index`).count(this.getKeyRange());
+			}
 			cursorRequest.onsuccess = ev => {
 				resolve(ev.target.result);
 			};
@@ -299,7 +319,7 @@ class Cursor {
 				transaction = database.transaction([this.storeName], 'readwrite'),
 				objectStore = transaction.objectStore(this.storeName),
 				index = objectStore.index(`${this.field}Index`),
-				cursorRequest = index.openCursor(this.getKeyRange(), this.direction);
+				cursorRequest = index.openCursor(this.getKeyRange(), this.getDirectionParameter());
 
 			cursorRequest.onsuccess = ev => {
 				try {
@@ -390,6 +410,11 @@ class Cursor {
 
 	order(direction) {
 		this.direction = direction;
+		return this;
+	}
+
+	distinct() {
+		this.useDistinct = true;
 		return this;
 	}
 }

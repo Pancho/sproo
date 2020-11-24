@@ -1,6 +1,7 @@
 import { DemoPageComponent } from '../../../app/pages/demo/demo.js';
 import { EmptyPageComponent } from '../../../app/pages/empty/empty.js';
 import { NotFoundComponent } from '../../../app/pages/not-found/not-found.js';
+import { CSSTemplate, HTMLTemplate } from '../../../../fiu/js/component.js';
 import { AppTest } from '../../api/test.js';
 
 
@@ -67,5 +68,41 @@ export class CustomEventAppTest extends AppTest {
 			resolve();
 		}, 100));
 		await this.assertTrue(demoPage.valuesUpdated);
+	}
+}
+
+
+export class HTMLTemplateAppTest extends AppTest {
+	constructor() {
+		super('HTML Template App Test', 'Static HTML template found', 'Static HTML template could not be found', ROUTES_APP_CONFIG, true);
+	}
+
+	async test() {
+		const template = EmptyPageComponent.template;
+		const passes = template instanceof HTMLTemplate && template.asString().length === 166 && !!template.asDocument().querySelector('template');
+		await this.assertTrue(passes);
+	}
+}
+
+
+export class CSSTemplateAppTest extends AppTest {
+	constructor() {
+		super('CSS Template App Test', 'Static CSS templates found', 'Static CSS templates could not be found', ROUTES_APP_CONFIG, true);
+	}
+
+	async test() {
+		const templates = EmptyPageComponent.stylesheets;
+
+		const passes = [];
+
+		templates.forEach(template => {
+			if (template instanceof CSSTemplate) {
+				passes.push(template.asString().length === 351 && template.asStyleSheet().rules.length === 7);
+			} else {
+				passes.push(true);
+			}
+		});
+
+		await this.assertTrue(passes.every(elm => elm === true));
 	}
 }
