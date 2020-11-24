@@ -1,6 +1,7 @@
 'use strict';
 import { App } from './app.js';
 import { Utils } from './utils.js';
+
 /* I wanted to have this "middleman", due to JS not supporting real decorators yet, to avoid boilerplate in the actual
 * component/element class implementation. I insist on not using babels and some obscure pollyfills, to achieve decorator like effect,
 * both of which require one quarter of npm dependencies to produce sub-par, bloated, unreadable cesspool of JS code in the end (let's
@@ -374,6 +375,10 @@ export class Component extends HTMLElement {
 			return;
 		}
 		this.parentElement.removeChild(this);
+	}
+
+	dispatch(eventName, obj) {
+		this.dispatchEvent(new CustomEvent(eventName, obj));
 	}
 
 	static spreadPath(key, value) {

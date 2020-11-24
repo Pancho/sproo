@@ -6,7 +6,7 @@ export class ChildComponent extends Component {
 	static stylesheets = [];
 
 	set coords(coords) {
-		this.dispatchEvent(new CustomEvent('values-updated', coords));
+		this.dispatch('values-updated', coords);
 		this.context = {
 			coords: coords,
 		};
