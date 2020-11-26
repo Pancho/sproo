@@ -40,7 +40,7 @@ export class LogLevels {
 	 */
 	static ERROR = 7;
 	/**
-	 * Completely disable all loggin functions
+	 * Completely disable all logging functions
 	 */
 	static DISABLE_LOGS = 8;
 }
@@ -77,8 +77,8 @@ export class LoggerFactory {
 			if (this.logLevel > minLevel) {
 				return this.noop;
 			}
-			const params = [console, '%c' + initiator, style, ...outerArgs];
-			if (this.worker) {
+			const params = [console, `%c${initiator}`, style, ...outerArgs];
+			if (!!this.worker) {
 				this.worker.postMessage({
 					source: initiator,
 					arguments: JSON.stringify(outerArgs),

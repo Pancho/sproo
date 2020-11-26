@@ -14,6 +14,8 @@ export class Mavor {
 		'easeOutQuint': t => 1 + (--t) * t * t * t * t,
 		'easeInOutQuint': t => t < 0.5 ? 16 * t * t * t * t * t : 1 + 16 * (--t) * t * t * t * t,
 	};
+	static NOOP = () => {
+	};
 
 	// TODO: This needs fixing to work in this context
 	static scrollTo(destination, duration, easing, callback) {
@@ -42,7 +44,7 @@ export class Mavor {
 
 		duration = duration || 200;
 		easing = easing || 'linear';
-		callback = callback || u.noop;
+		callback = callback || Mavor.NOOP;
 
 		if (!('requestAnimationFrame' in window)) {
 			window.scroll(0, destinationOffsetToScroll);
@@ -77,7 +79,7 @@ export class Mavor {
 		return array.map(function (currentValue, index, originalArray) {
 			return currentValue.map(function (innerCurrentValue, innerIndex, innerOriginalArray) {
 				if (isNaN(innerCurrentValue)) {
-					return '\\' + innerCurrentValue.replace(/"/g, '""') + '\\';
+					return `\\${innerCurrentValue.replace(/"/g, '""')}\\`;
 				} else {
 					return innerCurrentValue;
 				}
@@ -104,7 +106,7 @@ export class Mavor {
 
 	static deepFlatten(array) {
 		return [].concat.apply([], array.map(function (currentValue) {
-			return (Array.isArray(currentValue) ? u.deepFlatten(currentValue) : currentValue);
+			return (Array.isArray(currentValue) ? Mavor.deepFlatten(currentValue) : currentValue);
 		}));
 	}
 
@@ -124,7 +126,7 @@ export class Mavor {
 			columns.join(delimiter),
 		].concat(array.map(function (currentValue) {
 			return columns.reduce(function (acc, key) {
-				return '' + acc + (!acc.length ? '' : delimiter) + '"' + (!currentValue[key] ? '' : currentValue[key]) + '"';
+				return `${acc}${(!acc.length ? '' : delimiter)}"${(!currentValue[key] ? '' : currentValue[key])}"`;
 			}, '');
 		})).join('\n');
 	}
@@ -161,12 +163,6 @@ export class Mavor {
 		return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 	}
 
-	static camelize(text, separator = '-') {
-		text
-			.split(separator)
-			.reduce((acc, cur) => `${acc}${cur.charAt(0).toUpperCase() + cur.slice(1)}`, '');
-	}
-
 	static slugify(text) {
 		return text
 			.toString()
@@ -181,6 +177,10 @@ export class Mavor {
 
 	static kebabToCamel(string) {
 		return string.split('-').map((item, index) => index ? item.charAt(0).toUpperCase() + item.slice(1).toLowerCase() : item.toLowerCase()).join('');
+	}
+
+	static snakeToCamel(string) {
+		return string.split('_').map((item, index) => index ? item.charAt(0).toUpperCase() + item.slice(1).toLowerCase() : item.toLowerCase()).join('');
 	}
 
 	static camelToKebab(string) {
@@ -212,21 +212,20 @@ export class Mavor {
 				return callback(m);
 			});
 		});
-		observer.observe(element, Object.assign({
+		observer.observe(element, {
 			childList: true,
 			attributes: true,
 			attributeOldValue: true,
 			characterData: true,
 			characterDataOldValue: true,
 			subtree: true,
-		}, options));
+			...options,
+		});
 		return observer;
 	}
 
 	static runAsync(fn) {
-		const worker = new Worker(URL.createObjectURL(new Blob(['postMessage((' + fn + ')());']), {
-			type: 'application/javascript; charset=utf-8',
-		}));
+		const worker = new Worker(URL.createObjectURL(new Blob([`postMessage((${fn})());`])));
 		return new Promise(function (resolve, reject) {
 			worker.onmessage = function (result) {
 				const data = result.data;
@@ -296,7 +295,7 @@ export class Mavor {
 
 	static round(n, decimals) {
 		decimals = decimals || 0;
-		return Number(Math.round(Number(n + 'e' + decimals)) + 'e-' + decimals);
+		return Number(Math.round(Number(`${n}e${decimals}`)) + `e-${decimals}`);
 	}
 
 	static standardDeviation(arr, usePopulation) {
@@ -315,11 +314,15 @@ export class Mavor {
 	static flattenObject(obj, prefix) {
 		prefix = prefix || '';
 		return Object.keys(obj).reduce(function (acc, k) {
-			const pre = prefix.length ? prefix + '.' : '';
-			if (typeof obj[k] === 'object')
-				Object.assign(acc, u.flattenObject(obj[k], pre + k));
-			else
+			const pre = prefix.length ? `${prefix}.` : '';
+			if (typeof obj[k] === 'object') {
+				acc = {
+					...acc,
+					...Mavor.flattenObject(obj[k], pre + k),
+				};
+			} else {
 				acc[pre + k] = obj[k];
+			}
 			return acc;
 		}, {});
 	}
@@ -329,23 +332,6 @@ export class Mavor {
 			const val = fn ? fn(obj[key]) : obj[key];
 			acc[val] = acc[val] || [];
 			acc[val].push(key);
-			return acc;
-		}, {});
-	}
-
-	static unflattenObject(obj) {
-		return Object.keys(obj).reduce(function (acc, k) {
-			if (k.indexOf('.') !== -1) {
-				const keys = k.split('.');
-				Object.assign(acc, JSON.parse('{' +
-					keys.map(function (v, i) {
-						return (i !== keys.length - 1 ? '"' + v + '":{' : '"' + v + '":');
-					}).join('') +
-					obj[k] +
-					'}'.repeat(keys.length)));
-			} else {
-				acc[k] = obj[k];
-			}
 			return acc;
 		}, {});
 	}
@@ -365,14 +351,14 @@ export class Mavor {
 	}
 
 	static getCookie(name) {
-		const values = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+		const values = document.cookie.match(`(^|;) ?${name}=([^;]*)(;|$)`);
 		return values ? values[2] : null;
 	}
 
 	static setCookie(name, value, days) {
 		const newDate = new Date;
 		newDate.setTime(newDate.getTime() + 24 * 60 * 60 * 1000 * days);
-		document.cookie = name + '=' + value + ';path=/;expires=' + newDate.toUTCString();
+		document.cookie = `${name}=${value};path=/;expires=${newDate.toUTCString()}`;
 	}
 
 	static removeCookie(name) {
@@ -389,7 +375,7 @@ export class Mavor {
 
 	static scrambleColors() {
 		document.querySelectorAll('*').forEach(function (elm, index) {
-			elm.style.backgroundColor = 'rgba(' + Mavor.getRandomInt(256) + ', ' + Mavor.getRandomInt(256) + ', ' + Mavor.getRandomInt(256) + ', 1.0)';
+			elm.style.backgroundColor = `rgba(${Mavor.getRandomInt(256)}, ${Mavor.getRandomInt(256)}, ${Mavor.getRandomInt(256)}, 1.0)`;
 		});
 	}
 }

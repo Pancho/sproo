@@ -1,5 +1,3 @@
-import { CSSTemplate, HTMLTemplate } from './component.js';
-
 export class Utils {
 	static cssCache = {};
 	static cssQueue = [];
@@ -11,80 +9,56 @@ export class Utils {
 		'text-content': 'textContent',
 	};
 
-	static applyCss(stylesheet, shadowRoot, resolve) {
+	static getCSS(stylesheet, resolve) {
 		resolve = resolve || function () {
 		};
 
-		if (stylesheet instanceof CSSTemplate) {
-			shadowRoot.adoptedStyleSheets = [...shadowRoot.adoptedStyleSheets, stylesheet.asStyleSheet()];
-			resolve();
+		if (!!Utils.cssCache[stylesheet]) {
+			resolve(Utils.cssCache[stylesheet]);
+		} else if (!!Utils.cssQueue[stylesheet]) {
+			Utils.cssQueue[stylesheet].push(resolve);
 		} else {
-			if (!!Utils.cssCache[stylesheet]) {
-				shadowRoot.adoptedStyleSheets = [...shadowRoot.adoptedStyleSheets, Utils.cssCache[stylesheet]];
-				resolve();
-			} else if (!!Utils.cssQueue[stylesheet]) {
-				Utils.cssQueue[stylesheet].push({
-					root: shadowRoot,
-					resolve: resolve,
-				});
-			} else {
-				if (!Utils.cssQueue[stylesheet]) {
-					Utils.cssQueue[stylesheet] = [];
-				}
-				Utils.cssQueue[stylesheet].push({
-					root: shadowRoot,
-					resolve: resolve,
-				});
-
-				fetch(stylesheet.toLowerCase() + '.css', {
-					method: 'GET',
-				}).then((response) => {
-					return response.text();
-				}).then((css) => {
-					const styleSheet = new CSSStyleSheet();
-					styleSheet.replaceSync(css);
-					Utils.cssCache[stylesheet] = styleSheet;
-					Utils.cssQueue[stylesheet].forEach((conf, index) => {
-						conf.root.adoptedStyleSheets = [...conf.root.adoptedStyleSheets, styleSheet];
-						conf.resolve();
-					});
-				});
+			if (!Utils.cssQueue[stylesheet]) {
+				Utils.cssQueue[stylesheet] = [];
 			}
+			Utils.cssQueue[stylesheet].push(resolve);
+
+			fetch(`${stylesheet.toLowerCase()}.css`, {
+				method: 'GET',
+			}).then((response) => {
+				return response.text();
+			}).then((css) => {
+				const cssStyleSheet = new CSSStyleSheet();
+				cssStyleSheet.replaceSync(css);
+				Utils.cssCache[stylesheet] = cssStyleSheet;
+				Utils.cssQueue[stylesheet].forEach(queuedResolve => {
+					queuedResolve(cssStyleSheet);
+				});
+			});
 		}
 	}
 
 	static getTemplateHTML(name, resolve) {
 		resolve = resolve || function () {
 		};
-		if (name instanceof HTMLTemplate) {
-			resolve(name.asDocument());
-		} else {
-			if (!!Utils.templateCache[name]) {
-				resolve(Utils.templateCache[name].querySelector('template').content.cloneNode(true));
+		if (!!Utils.templateCache[name]) {
+				resolve(Utils.templateCache[name]);
 			} else if (!!Utils.templateQueue[name]) {
-				Utils.templateQueue[name].push({
-					resolve: resolve,
-				});
+				Utils.templateQueue[name].push(resolve);
 			} else {
 				if (!Utils.templateQueue[name]) {
 					Utils.templateQueue[name] = [];
 				}
-				Utils.templateQueue[name].push({
-					resolve: resolve,
-				});
+				Utils.templateQueue[name].push(resolve);
 
-				fetch(name.toLowerCase() + '.html', {
+				fetch(`${name.toLowerCase()}.html`, {
 					method: 'GET',
 				}).then(response => response.text()).then((html) => {
-					const doc = Utils.domParser.parseFromString(html, 'text/html');
-					Utils.templateCache[name] = doc;
-					let blob = Utils.templateQueue[name].pop();
-					while (blob) {
-						blob.resolve(doc.querySelector('template').content.cloneNode(true));
-						blob = Utils.templateQueue[name].pop();
-					}
+					Utils.templateCache[name] = html;
+					Utils.templateQueue[name].forEach(queuedResolve => {
+						queuedResolve(html);
+					});
 				});
 			}
-		}
 	}
 }
