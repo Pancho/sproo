@@ -72,6 +72,21 @@ export class Test {
 		return this.assertArraysEquals(value, expectedValue);
 	}
 
+	async assertObjectsEquals(value, expectedValue) {
+		return new Promise((resolve, reject) => {
+			if (deepEquals(value, expectedValue)) {
+				this.succeeded = true;
+				this.resultMessage = this.successMessage;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${JSON.stringify(value)}"</span> equals <span class="expected-value">"${JSON.stringify(expectedValue)}"</span>`;
+			} else {
+				this.failed = true;
+				this.resultMessage = this.failedMessage;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${JSON.stringify(value)}"</span> does not equal <span class="expected-value">"${JSON.stringify(expectedValue)}"</span>`;
+			}
+			resolve();
+		});
+	}
+
 	async assertNotEquals(value, expectedValue) {
 		return new Promise((resolve, reject) => {
 			if (value !== expectedValue) {
@@ -311,4 +326,27 @@ export class AppTest extends Test {
 		);
 		doc.elementFromPoint(x, y).dispatchEvent(mouseClickEvent);
 	}
+}
+
+function deepEquals(obj1, obj2) {
+	if (obj1 === obj2) {
+		return true;
+	}
+	if (obj1 instanceof Date && obj2 instanceof Date) {
+		return obj1.getTime() === obj2.getTime();
+	}
+	if (!obj1 || !obj2 || (typeof obj1 !== 'object' && typeof obj2 !== 'object')) {
+		return obj1 === obj2;
+	}
+	if (obj1.constructor !== obj2.constructor) {
+		return false;
+	}
+	if (obj1.constructor !== Object || obj2.constructor !== Object) {
+		return false;
+	}
+	let keys = Object.keys(obj1);
+	if (keys.length !== Object.keys(obj2).length) {
+		return false;
+	}
+	return keys.every(k => deepEquals(obj1[k], obj2[k]));
 }

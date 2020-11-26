@@ -13,7 +13,8 @@ export class App {
 	http = null;
 
 	constructor(config) {
-		let authentication;
+		let authentication,
+			styleSheetPromises = [];
 
 		if (!!App.instance) {
 			throw new Error('Only one instance of App allowed');
@@ -21,9 +22,16 @@ export class App {
 
 		if (!!config.rootStylesheets) {
 			config.rootStylesheets.forEach(stylesheet => {
-				Utils.applyCss(stylesheet, document);
+
+				styleSheetPromises.push(new Promise(resolve => Utils.getCSS(stylesheet, resolve)));
 			});
 		}
+
+		Promise.all([
+			...styleSheetPromises,
+		]).then(stylesheets => {
+			document.adoptedStyleSheets = stylesheets;
+		});
 
 		if (!!config.providers) {
 			config.providers.forEach(provider => App.provide(...provider));
@@ -43,8 +51,8 @@ export class App {
 
 		App.instance = this;
 		App.appReady = new Promise(resolve => {
-			// We must delay the initialization of the root components and router, so that the Component classes have time to subscribe to
-			// router's link handling, even if just by pushing everything to the end of the stack
+			// We must delay the initialization of the root components and router, as some modules used in this callback refer to the
+			// App.appReady promise.
 			setTimeout(() => {
 				if (!!config.rootComponents) {
 					config.rootComponents.forEach((component) => {

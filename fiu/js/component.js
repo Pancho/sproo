@@ -178,7 +178,7 @@ export class Component extends HTMLElement {
 		if (!!this.constructor.stylesheets) {
 			this.constructor.stylesheets.forEach(stylesheet => {
 				styleSheetPromises.push(
-					new Promise(resolve => Utils.applyCss(stylesheet, this.shadowRoot, resolve)),
+					new Promise(resolve => Utils.getCSS(stylesheet, resolve)),
 				);
 			});
 		}
@@ -215,9 +215,9 @@ export class Component extends HTMLElement {
 				App.appReady,
 				templateReady,
 				...styleSheetPromises,
-			]).then(([app, templateDocument]) => {
+			]).then(([app, templateDocument, ...stylesheets]) => {
 				this.app = app;
-				if (templateDocument instanceof Node) {
+				if (!!templateDocument) {
 					// const measurements = [];
 					// for (let i = 0; i < 10; i += 1) {
 					// 	const start = performance.now();
@@ -226,8 +226,10 @@ export class Component extends HTMLElement {
 					// 	measurements.push(end - start);
 					// }
 					// console.log(this.tagName, 'gatherFiuAttributes avg: ', measurements.reduce((prev, curr) => prev + curr, 0), measurements.reduce((prev, curr) => prev + curr, 0) / measurements.length);
-					this.gatherFiuAttributes(templateDocument);
-					this.shadowRoot.append(templateDocument);
+					this.shadowRoot.innerHTML = templateDocument;
+					this.gatherFiuAttributes(this.shadowRoot);
+					// this.shadowRoot.append(templateDocument);
+					this.shadowRoot.adoptedStyleSheets = stylesheets;
 					this.app.router.updatePageLinks(this.shadowRoot);
 					this.onTemplateLoaded();
 					resolve();
@@ -393,34 +395,5 @@ export class Component extends HTMLElement {
 
 	static isObject(obj) {
 		return Object.prototype.toString.call(obj) === '[object Object]';
-	}
-}
-
-
-class Static {
-	content = '';
-
-	constructor(content) {
-		this.content = content;
-	}
-
-	asString() {
-		return this.content;
-	}
-}
-
-
-export class HTMLTemplate extends Static {
-	asDocument() {
-		return Utils.domParser.parseFromString(this.content, 'text/html');
-	}
-}
-
-
-export class CSSTemplate extends Static {
-	asStyleSheet() {
-		const styleSheet = new CSSStyleSheet();
-		styleSheet.replaceSync(this.content);
-		return styleSheet;
 	}
 }

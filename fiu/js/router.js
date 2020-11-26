@@ -206,7 +206,7 @@ export class Router {
 			// even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
 			// for the SEO anyway.
 			'',
-			(this.routeRoot + '/' + location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')).replace(/([^:])(\/{2,})/g, '$1/'),
+			(`${this.routeRoot}/${location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')}`).replace(/([^:])(\/{2,})/g, '$1/'),
 		);
 		this.resolve();
 		return this;

@@ -8,7 +8,6 @@ export class DemoPageComponent extends Component {
 	static template = '/app/pages/demo/demo';
 	static stylesheets = [
 		'/fiu/css/meta',
-		'/fiu/css/palette',
 		'/fiu/css/normalize',
 		'/app/pages/demo/demo',
 	];
