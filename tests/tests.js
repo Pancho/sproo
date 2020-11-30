@@ -4,6 +4,7 @@ import { DatabaseSuite } from './spec/database/database-suite.js';
 import { FiuAppSuite } from './spec/fiu-app/fiu-app-suite.js';
 import { FiuComponentSuite } from './spec/fiu-component/fiu-component-suite.js';
 import { MavorSuite } from './spec/mavor/mavor-suite.js';
+import { StateManagementSuite } from './spec/state-management/state-management-suite.js';
 
 class Tests {
 	manager = new Manager();
@@ -15,6 +16,7 @@ class Tests {
 		this.manager.addSuite(new DatabaseSuite());
 		this.manager.addSuite(new FiuAppSuite());
 		this.manager.addSuite(new FiuComponentSuite());
+		this.manager.addSuite(new StateManagementSuite());
 		this.initNavigation();
 	}
 

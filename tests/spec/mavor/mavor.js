@@ -37,7 +37,6 @@ export class MavorArrayToCSVTest extends Test {
 	}
 
 	async test() {
-		console.log(Mavor.arrayToCSV([[1, 2, 3, 4], [5, 6, 7, 8]]));
 		return this.assertEquals(Mavor.arrayToCSV([[1, 2, 3, 4], [5, 6, 7, 8]], '|'), '1|2|3|4\n5|6|7|8');
 	}
 }

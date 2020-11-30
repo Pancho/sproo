@@ -28,17 +28,6 @@ export class DemoPageComponent extends Component {
 
 	constructor() {
 		super();
-		// fromEvent(document, 'click').pipe(
-		// 	tap((ev) => {
-		// 		this.context = {
-		// 			coords: {
-		// 				x: ev.screenX,
-		// 				y: ev.screenY,
-		// 			},
-		// 		};
-		// 	}),
-		// 	takeUntil(this.unsubscribe),
-		// ).subscribe();
 	}
 
 	unload() {
@@ -47,21 +36,6 @@ export class DemoPageComponent extends Component {
 	}
 
 	onTemplateLoaded() {
-		// this.context = {
-		// 	blah: 'Some text',
-		// 	// showParagraph: false,
-		// 	showParagraph: true,
-		// 	inner: {
-		// 		value: {
-		// 			more: 'ok',
-		// 		},
-		// 	},
-		// };
-		// setInterval(() => {
-		// 	this.context = {
-		// 		blah: new Date(),
-		// 	};
-		// }, 1000);
 	}
 
 	logEvent(ev) {

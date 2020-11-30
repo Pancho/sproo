@@ -1,28 +1,33 @@
 import { Observable } from './reactive/observable.js';
-import { filter, pluck, tap } from './reactive/operators.js';
+import { filter, pluck } from './reactive/operators.js';
 import { BehaviorSubject } from './reactive/subject.js';
 
-let store = {};
+let store = {
+	// random: Math.random(),
+};
 
 class State extends BehaviorSubject {
 	store;
 
-	constructor(store, action$) {
-		super(store);
-		this.store = store;
+	constructor(sliceStore, action$, persistence) {
+		super(sliceStore);
+		this.store = sliceStore;
 		this.stateSubscription = action$.subscribe(action => {
 			if (!!action.slice) {
 				const actionSliceArray = action.slice.split('/');
 				const key = actionSliceArray.splice(0, actionSliceArray.length - 1).join('/');
 				let state = Store.getSlice(
 					key,
-					this.store
+					this.store,
 				);
 				action.reducer(state);
 				this.next({
 					slice: action.slice,
 					state: this.store,
 				});
+				if (!!persistence) {
+					persistence.setItem(Store.STORE_KEY, store);
+				}
 			} else {
 				this.next({
 					slice: 'initial',
@@ -44,27 +49,27 @@ class State extends BehaviorSubject {
 
 export class Store extends Observable {
 	static STORE_KEY = 'fiu/store';
-	persist;
+	persistence;
 	store;
 	slice;
 	action$;
 	source;
 
-	constructor(slice, persist) {
+	constructor(slice, persistence) {
 		super();
 
-		if (!!persist) {
-			const existing = localStorage.getItem(Store.STORE_KEY);
+		if (!!persistence) {
+			const existing = persistence.getItem(Store.STORE_KEY);
 			if (!!existing) {
-				store = JSON.parse(existing);
+				store = existing;
 			}
 		}
 
-		this.persist = persist;
+		this.persistence = persistence;
 		this.slice = slice;
 		this.store = Store.getSlice(slice, store);
 		this.action$ = new BehaviorSubject(this.store);
-		this.source = new State(this.store, this.action$);
+		this.source = new State(this.store, this.action$, persistence);
 	}
 
 	get [Symbol.toStringTag]() {
@@ -79,25 +84,37 @@ export class Store extends Observable {
 		return this.pipe(
 			filter(update => {
 				return (update.slice === slice || update.slice === 'initial') &&
-					Object.keys(update.state).length !== 0 && update.state.constructor === Object
+					Object.keys(update.state).length !== 0 && update.state.constructor === Object;
 			}),
 			pluck('state', ...slice.split('/')),
-			tap(() => {
-				localStorage.setItem(Store.STORE_KEY, JSON.stringify(store));
-			})
 		);
+	}
+
+	clearStore() {
+		store = {};
 	}
 
 	static get(slice, persist = false) {
 		return new Store(slice, persist);
 	}
 
-	static getSlice(slice, store) {
+	static getSlice(slice, storeCtx) {
 		return slice.split('/').reduce((prevSlice, nextSlice) => {
 			if (!prevSlice[nextSlice]) {
 				prevSlice[nextSlice] = {};
 			}
 			return prevSlice[nextSlice];
-		}, store);
+		}, storeCtx);
+	}
+}
+
+
+export class Persistence {
+	getItem(key) {
+		throw Error('Persistence.getItem(key) has to be implemented');
+	}
+
+	setItem(key, object) {
+		throw Error('Persistence.setItem(key, object) has to be implemented');
 	}
 }
