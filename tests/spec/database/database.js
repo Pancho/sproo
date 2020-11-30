@@ -198,7 +198,6 @@ export class DatabaseDataPutTest extends Test {
 				groups: ['admin', 'tester'],
 			});
 		} catch (e) {
-			console.log(e);
 			exception = e;
 		}
 

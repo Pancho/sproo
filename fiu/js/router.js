@@ -118,7 +118,7 @@ export class Router {
 						params = params || [];
 						RouterUtils.inject(new route.component(...params));
 					} catch (e) {
-						console.log('Check if you imported the declared your component in the app or in the child component');
+						console.log('Check whether you\'ve imported the declared your component in the app or in the child component');
 						throw e;
 					}
 				},
