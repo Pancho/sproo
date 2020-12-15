@@ -1,0 +1,36 @@
+form element attributes:
+* autocomplete(on|off)
+* enctype (application/x-www-form-urlencoded: The default value; multipart/form-data: Use this if the form contains <input> elements with type=file; text/plain: Introduced by HTML5 for debugging purposes.)
+
+
+other elements:
+* input with datalist (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/datalist)
+* select
+* textarea
+
+input types
+checkbox
+date
+datetime-local
+email
+file
+hidden
+number
+password
+radio
+range?
+reset
+search
+submit
+tel
+url
+
+attributes:
+* autofocus
+* disabled
+* min
+* max
+* minlength
+* placeholder
+* required
+*
