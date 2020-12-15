@@ -1,4 +1,4 @@
-export class Guard {
+export default class Guard {
 	constructor() {}
 
 	get [Symbol.toStringTag]() {

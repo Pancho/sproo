@@ -1,6 +1,6 @@
 // This is an IndexedDB wrapper with a more friendly interface
 // TODO: docs
-export class Database {
+export default class Database {
 	name;
 	dbReady;
 	version = 1;

@@ -1,6 +1,6 @@
-import { Component } from '../../../fiu/js/component.js';
+import Component from '../../../fiu/js/component.js';
 
-export class EmptyPageComponent extends Component {
+export default class EmptyPageComponent extends Component {
 	static tagName = 'empty-page';
 	static template = '/app/pages/empty/empty';
 	static stylesheets = [

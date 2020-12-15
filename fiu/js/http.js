@@ -1,4 +1,4 @@
-export class Http {
+export default class Http {
 	static STANDARD_HEADERS = {
 		'Accept': 'application/json, text/plain, */*',
 		// 'Content-Type': 'application/json',
@@ -36,9 +36,9 @@ export class Http {
 		}
 
 		if (queryString.length > 0) {
-			return `${this.httpEndpointStub}/${path}?${queryString}`
+			return `${this.httpEndpointStub}/${path}?${queryString}`;
 		} else {
-			return `${this.httpEndpointStub}/${path}`
+			return `${this.httpEndpointStub}/${path}`;
 		}
 	}
 

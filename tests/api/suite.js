@@ -1,4 +1,4 @@
-import { Mavor } from '../../fiu/js/mavor.js';
+import Mavor from '../../fiu/js/mavor.js';
 
 export class Suite {
 	name;

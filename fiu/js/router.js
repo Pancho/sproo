@@ -21,13 +21,7 @@
 * own). Each of those provides only two other properties, like so:
 *
 * specialBlob = {
-*   component: MyGreatComponent,
-*   hooks: { // Totally optional, see "hooks" for more info on when, how any why each fires
-*       before: () => {},
-*       after: () => {},
-*       already: () => {},
-*       leave: () => {},
-*   }
+*   component: MyGreatComponent
 * }
 *
 * should you want to add some guards for these two, just add the invocation to the before hook (for others it's automatic, should a guard
@@ -45,13 +39,7 @@
 * },
 * {
 *   path: '/main',
-*	component: MainComponent,
-*   hooks: {
-*       before: (done, params) => {}, // This gets executed before we load this component (for instance to check permissions, default will do exactly that)
-*       after: (params) => {}, // This gets executed after your component is loaded (not necessarily rendered though, that depends on the component)
-*       already: (params) => {}, // This gets executed if one requests this route again (so it doesn't do anything but call this hook, should you need to cover that scenario)
-*       leave: (params) => {}, // This gets called after one requests new route (like onbeforeunload, but not exactly like that) and unloads this one
-*   }
+*	component: MainComponent
 * },
 * {
 * ...
@@ -73,12 +61,9 @@
 * increases url readability, even google recommends this: https://support.google.com/webmasters/answer/76329?hl=en) and camelCase
 * convention for naming your parameters (you're writing JS not Python)
 *
-* While hooks are optional and pretty simple to understand, I need to stress that component must extend Component class (from
-* ./fiu/component.js) and follow the convention or unexpected things may happen. It might be so that this could work without that
-* class in between, but I did not spend a single second trying that scenario out, and most likely will not.
 * Do not try to make a path like '' or '/', because those (or that) are a special case called homePage and are reserved for that.
 */
-export class Router {
+export default class Router {
 	routeRoot = null;
 	routes = [];
 	lastRouteResolved = {};
@@ -99,44 +84,39 @@ export class Router {
 		this.authenticationUrl = authenticationUrl;
 
 		window.addEventListener('popstate', this.resolve);
-		this.updatePageLinks();
 
 		this.homePageRoute = {
-			handler: () => RouterUtils.inject(new homePage.component()),
-			hooks: homePage.hooks,
+			handler: async () => {
+				return RouterUtils.inject(homePage.component);
+			},
 		};
 		this.notFoundRoute = {
-			handler: () => RouterUtils.inject(new notFound.component()),
-			hooks: notFound.hooks,
+			handler: async () => {
+				return RouterUtils.inject(notFound.component);
+			},
 		};
 
-		(routes || []).forEach((route, index) => {
-			this.on(
-				route.path,
-				params => {
-					try {
+		if (Array.isArray(routes)) {
+			routes.forEach((route, index) => {
+				this.add(
+					route.path,
+					async params => {
 						params = params || [];
-						RouterUtils.inject(new route.component(...params));
-					} catch (e) {
-						console.log('Check if you imported the declared your component in the app or in the child component');
-						throw e;
-					}
-				},
-				{
-					before: (done, params) => {
 						if (!!route.guard) {
-							const guard = new route.guard();
-							guard.guard(this, route).then(result => {
-								done(result);
+							return import(route.guard).then(guardModule => {
+								const guard = new guardModule.default();
+								return guard.guard(this, route).then(async result => {
+									return RouterUtils.inject(route.component, ...params);
+								});
 							});
 						} else {
-							done();
+							return RouterUtils.inject(route.component, ...params);
 						}
 					},
-					...route.hooks,
-				},
-			);
-		});
+				);
+			});
+		}
+
 		this.resolve();
 	}
 
@@ -151,52 +131,17 @@ export class Router {
 		window.removeEventListener('popstate', this.resolve);
 	}
 
-	add(route, handler = null, hooks = null) {
+	add(route, handler = null) {
 		if (typeof route === 'string') {
 			route = encodeURI(route);
 		}
 		this.routes.push({
 			path: route,
 			handler: handler,
-			hooks: hooks,
-		});
-
-		return this.add;
-	}
-
-	on(...args) {
-		this.add(...args);
-		return this;
-	}
-
-	updatePageLinks(doc) {
-		doc = doc || document;
-		doc.addEventListener('click', (event) => {
-			let target = event.target;
-			for (; !!target && !!target.parentElement; target = target.parentNode) {
-				if (target.matches('[route]')) {
-					if ((event.ctrlKey || event.metaKey) && event.target.tagName.toLowerCase() === 'a') {
-						return false;  // Could do preventDefault, but would return either way, so this is actually perfectly fine
-					}
-
-					const location = target.getAttribute('route');
-
-					if (!this.destroyed) {
-						event.preventDefault();
-						this.navigate(
-							location
-								.replace(RouterUtils.CLEAN_TRAILING_SLASH, '')
-								.replace(RouterUtils.CLEAN_LEADING_SLASH, '/'),
-							{...target.dataset},  // "cast" to dict
-						);
-					}
-					break;
-				}
-			}
 		});
 	}
 
-	navigate(location, data) {
+	async navigate(location, data) {
 		data = data || {};
 		location = location || '';
 		window.history.pushState(
@@ -208,8 +153,7 @@ export class Router {
 			'',
 			(`${this.routeRoot}/${location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')}`).replace(/([^:])(\/{2,})/g, '$1/'),
 		);
-		this.resolve();
-		return this;
+		return this.resolve();
 	}
 
 	match(path) {
@@ -227,60 +171,33 @@ export class Router {
 			}).filter(match => match)[0];
 	}
 
-	callLeave() {
-		const lastRouteResolved = this.lastRouteResolved;
-
-		if (lastRouteResolved && lastRouteResolved.hooks && lastRouteResolved.hooks.leave) {
-			lastRouteResolved.hooks.leave(lastRouteResolved.params);
-		}
-	}
-
-	resolve(current) {
+	async resolve(current) {
 		const url = current || RouterUtils.clean(window.location.href),
 			path = RouterUtils.splitURL(url.replace(this.routeRoot, ''));
 
 		if (!!this.lastRouteResolved && this.lastRouteResolved.path === path) {
-			if (!!this.lastRouteResolved.hooks && !!this.lastRouteResolved.hooks.already) {
-				this.lastRouteResolved.hooks.already(this.lastRouteResolved.params);
-			}
 			return false;
 		}
 
 		const match = this.match(path);
 
 		if (!!match) {
-			this.callLeave();
 			this.lastRouteResolved = {
 				path: path,
-				hooks: match.route.hooks,
 				params: match.params,
 			};
 
-			const handler = match.route.handler;
-			RouterUtils.manageHooks(() => {
-				match.route.path instanceof RegExp ?
-					handler((match.match.slice(1, match.match.length))) :
-					handler(match.params);
-			}, match.route.hooks, match.params);
-			return match;
+			return match.route.handler(match.params);
 		} else if (!!this.homePageRoute && (path === '' || path === '/')) {
-			RouterUtils.manageHooks(() => {
-				this.callLeave();
-				this.lastRouteResolved = {
-					path: path,
-					hooks: this.homePageRoute.hooks,
-				};
-				this.homePageRoute.handler();
-			}, this.homePageRoute.hooks);
+			this.lastRouteResolved = {
+				path: path,
+			};
+			return this.homePageRoute.handler();
 		} else if (!!this.notFoundRoute) {
-			RouterUtils.manageHooks(() => {
-				this.callLeave();
-				this.lastRouteResolved = {
-					path: path,
-					hooks: this.notFoundRoute.hooks,
-				};
-				this.notFoundRoute.handler();
-			}, this.notFoundRoute.hooks);
+			this.lastRouteResolved = {
+				path: path,
+			};
+			return this.notFoundRoute.handler();
 		}
 		return false;
 	}
@@ -347,28 +264,6 @@ class RouterUtils {
 			}, null);
 	}
 
-	static manageHooks(handler, hooks, params) {
-		if (!!hooks && typeof hooks === 'object') {
-			if (!!hooks.before) {
-				hooks.before((shouldRoute = true) => {
-					if (!shouldRoute) {
-						return;
-					}
-					handler();
-					if (!!hooks.after) {
-						hooks.after(params);
-					}
-				}, params);
-				return;
-			} else if (!!hooks.after) {
-				handler();
-				hooks.after(params);
-				return;
-			}
-		}
-		handler();
-	}
-
 	static getUrlDepth(url) {
 		return url.replace(RouterUtils.DEPTH_TRAILING_SLASH, '').split('/').length;
 	}
@@ -377,7 +272,7 @@ class RouterUtils {
 		return RouterUtils.getUrlDepth(urlB) - RouterUtils.getUrlDepth(urlA);
 	}
 
-	static inject(component) {
+	static async inject(component, ...params) {
 		const outlet = document.querySelector('router-outlet');
 
 		if (!outlet) {
@@ -390,6 +285,19 @@ class RouterUtils {
 			}
 			outlet.removeChild(outlet.firstChild);
 		}
-		outlet.appendChild(component);
+		return new Promise(resolve => {
+			import(component).then(module => {
+				if (!module || !module.default) {
+					throw new Error(`We cannot render a component from module ${module}`);
+				}
+				if (!customElements.get(module.default.tagName)) {
+					customElements.define(module.default.tagName, module.default);
+				}
+				outlet.appendChild(new module.default(...params));
+				resolve();
+			}).catch(error => {
+				throw new Error(error);
+			});
+		});
 	}
 }

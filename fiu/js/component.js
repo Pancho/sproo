@@ -1,5 +1,5 @@
 'use strict';
-import { App } from './app.js';
+import App from './app.js';
 import { Utils } from './utils.js';
 
 /* I wanted to have this "middleman", due to JS not supporting real decorators yet, to avoid boilerplate in the actual
@@ -133,7 +133,7 @@ import { Utils } from './utils.js';
 *
 * So... in the end, you would end with the folder structure mentioned at the "template" section and a class looking like this:
 *
-* import { Component } from './sablono/fiu/component.js';
+* import Component from './sablono/fiu/component.js';
 *
 * export class TagComponent extends Component {
 * 	static tagName = 'tag';
@@ -150,14 +150,17 @@ import { Utils } from './utils.js';
 * }
 */
 
-export class Component extends HTMLElement {
-	// This property tells whether this component has been removed from the host document
-	unloaded = false;
 
+const CLEAN_TRAILING_SLASH = new RegExp(/\/+$/);
+const CLEAN_LEADING_SLASH = new RegExp(/^\/+/);
+
+
+export default class Component extends HTMLElement {
 	// Index of bound elements. Can change during runtime as it gets updated (or rather overwritten) on every mutation.
 	bindingIndex = {};
 
 	// Promise that's resolved when the onTemplateLoaded has already been executed
+	templateLoaded;
 
 	/* Creates an instance of Component, which is really just a convenience wrapper for HTMLElement (the actual component)
 	*
@@ -174,34 +177,6 @@ export class Component extends HTMLElement {
 			mode: 'open',
 		});
 
-		const styleSheetPromises = [];
-		if (!!this.constructor.stylesheets) {
-			this.constructor.stylesheets.forEach(stylesheet => {
-				styleSheetPromises.push(
-					new Promise(resolve => Utils.getCSS(stylesheet, resolve)),
-				);
-			});
-		}
-
-		const injections = App.inject(this.constructor);
-		Object.entries(injections).forEach(([propertyName, injection]) => {
-			this[propertyName] = injection;
-		});
-		if (!!App.loggerFactory) {
-			this.logger = App.loggerFactory.getLogger(this.constructor);
-		}
-
-		if (!!this.constructor.registerComponents) {
-			this.constructor.registerComponents.forEach((component) => {
-				if (!customElements.get(component.tagName)) {  // Should not load twice, right
-					customElements.define(component.tagName, component);
-				}
-				Object.keys(injections).forEach((propertyName) => {
-					component.prototype[propertyName] = injections[propertyName];
-				});
-			});
-		}
-
 		const templateReady = new Promise(resolve => {
 			if (!!this.constructor.template) {
 				Utils.getTemplateHTML(this.constructor.template, resolve);
@@ -210,31 +185,92 @@ export class Component extends HTMLElement {
 			}
 		});
 
+		const styleSheetPromises = [];
+		if (!!this.constructor.stylesheets) {
+			this.constructor.stylesheets.forEach(stylesheet => {
+				styleSheetPromises.push(
+					new Promise(resolve =>
+						Utils.getCSS(typeof stylesheet === 'string' ? `${App.staticRoot}${stylesheet}` : stylesheet, resolve),
+					),
+				);
+			});
+		}
+
+		const importPromises = [];
+		if (!!this.constructor.registerComponents) {
+			this.constructor.registerComponents.forEach((component) => {
+				importPromises.push(import(component));
+			});
+		}
+
+		this.app = App.instance;
+
+		// this.templateLoaded = new Promise(resolve => {
+		// 	templateReady.then(templateDocument => {
+		// 		if (templateDocument instanceof Node) {
+		// 			this.shadowRoot.append(templateDocument);
+		// 			this.processFiuAttributes(this.shadowRoot);
+		// 			this.updatePageLinks(this.shadowRoot);
+		// 			Promise.all([...styleSheetPromises]).then(([...stylesheets]) => {
+		// 				this.shadowRoot.adoptedStyleSheets = [...stylesheets];
+		// 			});
+		// 			Promise.all(importPromises).then(([...componentModules]) => {
+		// 				componentModules
+		// 					.filter(module => !customElements.get(module.default.tagName))
+		// 					.forEach(module => customElements.define(module.default.tagName, module.default));
+		// 				this.onTemplateLoaded();
+		// 				resolve();
+		// 			});
+		// 		}
+		// 	});
+		// });
+
 		this.templateLoaded = new Promise(resolve => {
-			Promise.all([
-				App.appReady,
-				templateReady,
-				...styleSheetPromises,
-			]).then(([app, templateDocument, ...stylesheets]) => {
-				this.app = app;
-				if (!!templateDocument) {
-					// const measurements = [];
-					// for (let i = 0; i < 10; i += 1) {
-					// 	const start = performance.now();
-					// 	this.gatherFiuAttributes(templateDocument);
-					// 	const end = performance.now()
-					// 	measurements.push(end - start);
-					// }
-					// console.log(this.tagName, 'gatherFiuAttributes avg: ', measurements.reduce((prev, curr) => prev + curr, 0), measurements.reduce((prev, curr) => prev + curr, 0) / measurements.length);
-					this.shadowRoot.innerHTML = templateDocument;
-					this.gatherFiuAttributes(this.shadowRoot);
-					// this.shadowRoot.append(templateDocument);
-					this.shadowRoot.adoptedStyleSheets = stylesheets;
-					this.app.router.updatePageLinks(this.shadowRoot);
-					this.onTemplateLoaded();
-					resolve();
+			Promise.all([templateReady, ...styleSheetPromises]).then(([templateDocument, ...stylesheets]) => {
+				if (templateDocument instanceof Node) {
+					this.shadowRoot.adoptedStyleSheets = [...stylesheets];
+					this.shadowRoot.append(templateDocument);
+					this.processFiuAttributes(this.shadowRoot);
+					this.updatePageLinks(this.shadowRoot);
+					Promise.all(importPromises).then(([...componentModules]) => {
+						componentModules
+							.filter(module => !customElements.get(module.default.tagName))
+							.forEach(module => customElements.define(module.default.tagName, module.default));
+						this.onTemplateLoaded();
+						resolve();
+					});
 				}
 			});
+		});
+
+		if (!!App.loggerFactory) {
+			this.logger = App.loggerFactory.getLogger(this.constructor);
+		}
+	}
+
+	updatePageLinks(doc) {
+		doc.addEventListener('click', (event) => {
+			let target = event.target;
+			for (; !!target && !!target.parentElement; target = target.parentNode) {
+				if (target.matches('[route]')) {
+					if ((event.ctrlKey || event.metaKey) && event.target.tagName.toLowerCase() === 'a') {
+						return false;  // Could do preventDefault, but would return either way, so this is actually perfectly fine
+					}
+
+					const location = target.getAttribute('route');
+
+					if (!this.app.router.destroyed) {
+						event.preventDefault();
+						this.app.router.navigate(
+							location
+								.replace(CLEAN_TRAILING_SLASH, '')
+								.replace(CLEAN_LEADING_SLASH, '/'),
+							{...target.dataset},  // "cast" to dict
+						);
+					}
+					break;
+				}
+			}
 		});
 	}
 
@@ -242,7 +278,7 @@ export class Component extends HTMLElement {
 		return 'Component';
 	}
 
-	gatherFiuAttributes(templateDocument) {
+	processFiuAttributes(templateDocument) {
 		templateDocument.querySelectorAll('*').forEach(refElement => {
 			const attributeNames = refElement.getAttributeNames();
 			if (attributeNames.length > 0) {
@@ -381,6 +417,15 @@ export class Component extends HTMLElement {
 
 	dispatch(eventName, obj) {
 		this.dispatchEvent(new CustomEvent(eventName, obj));
+	}
+
+	getStyleElement() {
+		let style = this.getElement('style');
+		if (!style) {
+			style = this.newElement('style');
+			this.shadowRoot.appendChild(style);
+		}
+		return style;
 	}
 
 	static spreadPath(key, value) {

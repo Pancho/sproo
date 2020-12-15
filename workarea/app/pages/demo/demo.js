@@ -1,9 +1,7 @@
-import { Component } from '../../../fiu/js/component.js';
-import { Subject } from '../../../fiu/js/reactive/subject.js';
-import { Store } from '../../../fiu/js/state-management.js';
-import { ChildComponent } from '../../components/child-component/child-component.js';
+import Component from '../../../fiu/js/component.js';
 
-export class DemoPageComponent extends Component {
+
+export default class DemoPageComponent extends Component {
 	static tagName = 'demo-page';
 	static template = '/app/pages/demo/demo';
 	static stylesheets = [
@@ -12,18 +10,10 @@ export class DemoPageComponent extends Component {
 		'/app/pages/demo/demo',
 	];
 	static registerComponents = [
-		ChildComponent,
-	];
-	static STORE_PROVIDER = [
-		DemoPageComponent,
-		'store',
-		{
-			useFactory: Store.get,
-			params: ['pages/demo', true],
-		},
+		'/app/components/child-component/child-component.js',
 	];
 
-	unsubscribe = new Subject();
+	// unsubscribe = new Subject();
 	valuesUpdated = false;
 
 	constructor() {
@@ -41,10 +31,10 @@ export class DemoPageComponent extends Component {
 		// ).subscribe();
 	}
 
-	unload() {
-		this.unsubscribe.next();
-		this.unsubscribe.complete();
-	}
+	// unload() {
+	// 	this.unsubscribe.next();
+	// 	this.unsubscribe.complete();
+	// }
 
 	onTemplateLoaded() {
 		// this.context = {

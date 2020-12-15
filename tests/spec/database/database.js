@@ -1,4 +1,4 @@
-import { Database } from '../../../fiu/js/database.js';
+import Database from '../../../fiu/js/database.js';
 import { Test } from '../../api/test.js';
 
 
@@ -198,7 +198,7 @@ export class DatabaseDataPutTest extends Test {
 				groups: ['admin', 'tester'],
 			});
 		} catch (e) {
-			console.log(e);
+			console.error(e);
 			exception = e;
 		}
 

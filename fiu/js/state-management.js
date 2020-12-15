@@ -16,7 +16,7 @@ class State extends BehaviorSubject {
 				const key = actionSliceArray.splice(0, actionSliceArray.length - 1).join('/');
 				let state = Store.getSlice(
 					key,
-					this.store
+					this.store,
 				);
 				action.reducer(state);
 				this.next({
@@ -42,7 +42,7 @@ class State extends BehaviorSubject {
 	}
 }
 
-export class Store extends Observable {
+export default class Store extends Observable {
 	static STORE_KEY = 'fiu/store';
 	persist;
 	store;
@@ -79,12 +79,12 @@ export class Store extends Observable {
 		return this.pipe(
 			filter(update => {
 				return (update.slice === slice || update.slice === 'initial') &&
-					Object.keys(update.state).length !== 0 && update.state.constructor === Object
+					Object.keys(update.state).length !== 0 && update.state.constructor === Object;
 			}),
 			pluck('state', ...slice.split('/')),
 			tap(() => {
 				localStorage.setItem(Store.STORE_KEY, JSON.stringify(store));
-			})
+			}),
 		);
 	}
 

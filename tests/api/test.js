@@ -1,8 +1,8 @@
-import { App } from '../../fiu/js/app.js';
-import { Authentication } from '../../fiu/js/authentication.js';
-import { Http } from '../../fiu/js/http.js';
-import { Mavor } from '../../fiu/js/mavor.js';
-import { Router } from '../../fiu/js/router.js';
+import App from '../../fiu/js/app.js';
+import Authentication from '../../fiu/js/authentication.js';
+import Http from '../../fiu/js/http.js';
+import Mavor from '../../fiu/js/mavor.js';
+import Router from '../../fiu/js/router.js';
 
 
 export class Test {
@@ -239,7 +239,14 @@ export class Test {
 	}
 
 	async run() {
-		await this.setup();
+		try {
+			await this.setup();
+		} catch (e) {
+			this.exception = true;
+			this.resultMessage = 'Unhandled and unexpected exception happened during test setup';
+			console.error(e);
+		}
+
 		try {
 			await this.test();
 		} catch (e) {
@@ -247,7 +254,15 @@ export class Test {
 			this.resultMessage = 'Unhandled and unexpected exception happened during test run';
 			console.error(e);
 		}
-		await this.teardown();
+
+		try {
+			await this.teardown();
+		} catch (e) {
+			this.exception = true;
+			this.resultMessage = 'Unhandled and unexpected exception happened during test teardown';
+			console.error(e);
+		}
+
 		return true;
 	}
 
@@ -274,10 +289,9 @@ export class AppTest extends Test {
 	app;
 	routerOutlet;
 
-	constructor(name, successMessage, failedMessage, config, awaitApp) {
+	constructor(name, successMessage, failedMessage, config) {
 		super(name, successMessage, failedMessage);
 		this.config = config;
-		this.awaitApp = !!awaitApp;
 	}
 
 	async setup() {
@@ -285,9 +299,7 @@ export class AppTest extends Test {
 		this.routerOutlet = Mavor.createElement('<router-outlet></router-outlet>');
 		document.querySelector('body main').appendChild(this.routerOutlet);
 		this.app = new App(this.config);
-		if (this.awaitApp) {
-			await App.appReady;
-		}
+		await this.app.ready;
 	}
 
 	async teardown() {
@@ -298,7 +310,6 @@ export class AppTest extends Test {
 		);
 		document.querySelector('body main').removeChild(this.routerOutlet);
 		App.instance = null;
-		App.injectionRegistry = {};
 		Router.instance.destroy();
 		Router.instance = null;
 		Authentication.instance = null;

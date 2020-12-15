@@ -1,6 +1,6 @@
-import { Component } from '../../../fiu/js/component.js';
+import Component from '../../../fiu/js/component.js';
 
-export class NotFoundComponent extends Component {
+export default class NotFoundComponent extends Component {
 	static tagName = 'not-found-page';
 	static template = '/app/pages/not-found/not-found';
 	static stylesheets = [

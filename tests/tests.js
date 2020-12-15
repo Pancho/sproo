@@ -1,4 +1,4 @@
-import { Mavor } from '../fiu/js/mavor.js';
+import Mavor from '../fiu/js/mavor.js';
 import { Manager } from './api/manager.js';
 import { DatabaseSuite } from './spec/database/database-suite.js';
 import { FiuAppSuite } from './spec/fiu-app/fiu-app-suite.js';

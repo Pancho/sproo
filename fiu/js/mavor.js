@@ -1,4 +1,4 @@
-export class Mavor {
+export default class Mavor {
 	static EASING_OPTIONS = {
 		'linear': t => t,
 		'easeInQuad': t => t * t,
