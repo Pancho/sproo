@@ -1,28 +1,23 @@
-const levels = [
-	'with-warnings',
-	'trace',
-	'debug',
-	'log',
-	'warn',
-	'error',
-];
+const LEVELS = [
+		'with-warnings',
+		'trace',
+		'debug',
+		'log',
+		'warn',
+		'error',
+	],
+	WHITE = 0x00FFFFFF;
 
 /**
  * Factory class for {@see Logger}
  */
 export default class LoggerFactory {
+	[Symbol.toStringTag] = 'LoggerFactory';
 	/**
 	 * Current logging level
 	 */
 	logLevel = 'with-warnings';
 	worker;
-
-	get [Symbol.toStringTag]() {
-		return 'LoggerFactory';
-	}
-
-	noop() {
-	}
 
 	/**
 	 * @return Single log function that can be called, e.g. getSingleLogger(...)('hello world')
@@ -34,16 +29,20 @@ export default class LoggerFactory {
 	getSingleLogger(initiator, style, fn, minLevel = 'with-warnings') {
 		return (...outerArgs) => {
 			if (this.logLevel > minLevel) {
-				return this.noop;
+				return () => {
+				};
 			}
-			const params = [console, `%c${initiator}`, style, ...outerArgs];
-			if (!!this.worker) {
+
+			const params = [console, `%c${ initiator }`, style, ...outerArgs];
+
+			if (this.worker) {
 				this.worker.postMessage({
 					source: initiator,
 					arguments: JSON.stringify(outerArgs),
 					level: fn.name,
 				});
 			}
+
 			return Function.prototype.bind.apply(fn, params);
 		};
 	}
@@ -54,6 +53,7 @@ export default class LoggerFactory {
 	 */
 	getLogger(clazz) {
 		const style = LoggerFactory.getColorStyle(LoggerFactory.classToColor(clazz));
+
 		return {
 			trace: this.getSingleLogger(
 				clazz.name, style, console.trace, 'trace'),
@@ -77,9 +77,10 @@ export default class LoggerFactory {
 	}
 
 	setLogLevel(logLevel) {
-		if (!levels.includes(logLevel)) {
-			throw Error(`Invalid log level ${logLevel},  allowed levels:  ${JSON.stringify(levels)}`);
+		if (!LEVELS.includes(logLevel)) {
+			throw Error(`Invalid log level ${ logLevel },  allowed levels:  ${ JSON.stringify(LEVELS) }`);
 		}
+
 		this.logLevel = logLevel;
 	}
 
@@ -89,18 +90,20 @@ export default class LoggerFactory {
 	 */
 	static getColorStyle(color) {
 		return `color: white; background-color: ${
-			color}; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
+			color }; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
 	}
 
 	static classToColor(clazz) {
-		let hash = 0;
-		let i = 0;
+		let color = '#FFFFFF',
+			hash = 0,
+			i = 0;
 		const len = clazz.name.length;
+
 		for (; i < len; i += 1) {
 			hash = clazz.name.charCodeAt(i) + ((hash << 5) - hash);
 		}
 
-		const color = (hash & 0x00FFFFFF)
+		color = (hash & WHITE)
 			.toString(16)
 			.toUpperCase();
 
@@ -108,6 +111,6 @@ export default class LoggerFactory {
 	}
 
 	static createWorker(fn) {
-		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${fn}`])));
+		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${ fn }`])));
 	}
 }

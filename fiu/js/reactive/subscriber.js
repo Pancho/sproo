@@ -1,6 +1,6 @@
 const EMPTY_OBSERVER = {
 	closed: true,
-	next(value) {
+	next() {
 	},
 	error(err) {
 		throw err;
@@ -10,50 +10,50 @@ const EMPTY_OBSERVER = {
 };
 
 export class Subscription {
+	[Symbol.toStringTag] = 'Subscription';
+	static EMPTY = (function (empty) {
+		empty.closed = true;
+
+		return empty;
+	}(new Subscription));
 	closed = false;
 	parents = null;
 	subscriptions = null;
 
-	static EMPTY = (function (empty) {
-		empty.closed = true;
-		return empty;
-	}(new Subscription()));
-
 	constructor(unsubscribe) {
 		if (unsubscribe) {
-			this._unsubscribe = unsubscribe;
+			this.innerUnsubscribe = unsubscribe;
 		}
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'Subscription';
 	}
 
 	unsubscribe() {
-		let hasErrors = false;
-		let errors;
+		let hasErrors = false,
+			errors = null;
+
 		if (this.closed) {
 			return;
 		}
-		let {parents, subscriptions} = this;
+
+		const {parents, subscriptions} = this;
+
 		this.closed = true;
 		this.parents = null;
 		this.subscriptions = null;
 
-		if (!!parents) {
-			parents.forEach(parent => parent.remove(this));
+		if (parents) {
+			parents.forEach((parent) => parent.remove(this));
 		}
 
-		if (typeof this._unsubscribe === 'function') {
+		if (typeof this.innerUnsubscribe === 'function') {
 			try {
-				this._unsubscribe();
+				this.innerUnsubscribe();
 			} catch (e) {
 				errors = [e];
 			}
 		}
 
-		if (!!subscriptions) {
-			subscriptions.forEach(subscription => {
+		if (subscriptions) {
+			subscriptions.forEach((subscription) => {
 				try {
 					subscription.unsubscribe();
 				} catch (e) {
@@ -70,7 +70,7 @@ export class Subscription {
 	}
 
 	add(teardown) {
-		if (!teardown || (teardown === Subscription.EMPTY)) {
+		if (!teardown || teardown === Subscription.EMPTY) {
 			return Subscription.EMPTY;
 		}
 
@@ -79,6 +79,7 @@ export class Subscription {
 		}
 
 		let subscription = teardown;
+
 		if (typeof teardown === 'function') {
 			subscription = new Subscription(teardown);
 		} else if (typeof teardown === 'object') {
@@ -86,24 +87,29 @@ export class Subscription {
 				return subscription;
 			} else if (this.closed) {
 				subscription.unsubscribe();
+
 				return subscription;
 			}
 		} else if (this.closed) {
 			subscription.unsubscribe();
+
 			return subscription;
 		}
 
 		if (!this.subscriptions) {
 			this.subscriptions = [];
 		}
+
 		this.subscriptions.push(subscription);
 		subscription.addParent(this);
+
 		return subscription;
 	}
 
 	remove(subscription) {
 		if (this.subscriptions) {
 			const subscriptionIndex = this.subscriptions.indexOf(subscription);
+
 			if (subscriptionIndex !== -1) {
 				this.subscriptions.splice(subscriptionIndex, 1);
 			}
@@ -120,6 +126,8 @@ export class Subscription {
 }
 
 export class SubjectSubscription extends Subscription {
+	[Symbol.toStringTag] = 'SubjectSubscription';
+
 	constructor(subject, subscriber) {
 		super();
 		this.subject = subject;
@@ -127,22 +135,22 @@ export class SubjectSubscription extends Subscription {
 		this.closed = false;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'SubjectSubscription';
-	}
-
 	unsubscribe() {
 		if (this.closed) {
 			return;
 		}
+
 		this.closed = true;
-		const subject = this.subject;
-		const observers = subject.observers;
+		const subject = this.subject,
+			observers = subject.observers,
+			subscriberIndex = observers.indexOf(this.subscriber);
+
 		this.subject = null;
+
 		if (!observers || observers.length === 0 || subject.stopped || subject.closed) {
 			return;
 		}
-		const subscriberIndex = observers.indexOf(this.subscriber);
+
 		if (subscriberIndex !== -1) {
 			observers.splice(subscriberIndex, 1);
 		}
@@ -150,6 +158,7 @@ export class SubjectSubscription extends Subscription {
 }
 
 export class Subscriber extends Subscription {
+	[Symbol.toStringTag] = 'Subscriber';
 	syncErrorValue = null;
 	syncErrorThrown = false;
 	syncErrorThrowable = false;
@@ -177,27 +186,23 @@ export class Subscriber extends Subscription {
 		}
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'Subscriber';
-	}
-
 	next(value) {
 		if (!this.stopped) {
-			this._next(value);
+			this.innerNext(value);
 		}
 	}
 
 	error(err) {
 		if (!this.stopped) {
 			this.stopped = true;
-			this._error(err);
+			this.innerError(err);
 		}
 	}
 
 	complete() {
 		if (!this.stopped) {
 			this.stopped = true;
-			this._complete();
+			this.innerComplete();
 		}
 	}
 
@@ -205,36 +210,39 @@ export class Subscriber extends Subscription {
 		if (this.closed) {
 			return;
 		}
+
 		this.stopped = true;
 		super.unsubscribe();
 	}
 
-	_next(value) {
+	innerNext(value) {
 		this.destination.next(value);
 	}
 
-	_error(err) {
+	innerError(err) {
 		this.destination.error(err);
 		this.unsubscribe();
 	}
 
-	_complete() {
+	innerComplete() {
 		this.destination.complete();
 		this.unsubscribe();
 	}
 
 	unsubscribeAndRecycle() {
 		const {parents} = this;
+
 		this.parents = null;
 		this.unsubscribe();
 		this.closed = false;
 		this.stopped = false;
 		this.parents = parents;
+
 		return this;
 	}
 
 	static toSubscriber(observerOrNext, error, complete) {
-		if (!!observerOrNext && observerOrNext instanceof Subscriber) {
+		if (Boolean(observerOrNext) && observerOrNext instanceof Subscriber) {
 			return observerOrNext;
 		}
 
@@ -248,42 +256,48 @@ export class Subscriber extends Subscription {
 
 
 class SafeSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'SafeSubscriber';
 	parentSubscriber;
 
-	constructor(parentSubscriber, observerOrNext, error, complete) {
+	constructor(parentSubscriber, observerOrNext) {
 		super();
+
+		let internalNext = null,
+			internalError = null,
+			internalComplete = null,
+			context = this;
+
 		this.parentSubscriber = parentSubscriber;
-		let next;
-		let context = this;
+
 		if (typeof observerOrNext === 'function') {
-			next = observerOrNext;
+			internalNext = observerOrNext;
 		} else if (observerOrNext) {
-			next = observerOrNext.next;
-			error = observerOrNext.error;
-			complete = observerOrNext.complete;
+			internalNext = observerOrNext.next;
+			internalError = observerOrNext.error;
+			internalComplete = observerOrNext.complete;
+
 			if (observerOrNext !== EMPTY_OBSERVER) {
 				context = Object.create(observerOrNext);
+
 				if (typeof context.unsubscribe === 'function') {
 					this.add(context.unsubscribe.bind(context));
 				}
+
 				context.unsubscribe = this.unsubscribe.bind(this);
 			}
 		}
-		this.context = context;
-		this._next = next;
-		this._error = error;
-		this._complete = complete;
-	}
 
-	get [Symbol.toStringTag]() {
-		return 'SafeSubscriber';
+		this.context = context;
+		this.innerNext = internalNext;
+		this.innerError = internalError;
+		this.innerComplete = internalComplete;
 	}
 
 	next(value) {
-		if (!this.stopped && this._next) {
+		if (!this.stopped && this.innerNext) {
 			if (!this.parentSubscriber.syncErrorThrowable) {
-				this.tryOrUnsub(this._next, value);
-			} else if (this.tryOrSetError(this.parentSubscriber, this._next, value)) {
+				this.tryOrUnsub(this.innerNext, value);
+			} else if (this.tryOrSetError(this.parentSubscriber, this.innerNext, value)) {
 				this.unsubscribe();
 			}
 		}
@@ -291,34 +305,36 @@ class SafeSubscriber extends Subscriber {
 
 	error(err) {
 		if (!this.stopped) {
-			if (this._error) {
-				if (!this.parentSubscriber.syncErrorThrowable) {
-					this.tryOrUnsub(this._error, err);
+			if (this.innerError) {
+				if (this.parentSubscriber.syncErrorThrowable) {
+					this.tryOrSetError(this.parentSubscriber, this.innerError, err);
 					this.unsubscribe();
 				} else {
-					this.tryOrSetError(this.parentSubscriber, this._error, err);
+					this.tryOrUnsub(this.innerError, err);
 					this.unsubscribe();
 				}
-			} else if (!this.parentSubscriber.syncErrorThrowable) {
-				this.unsubscribe();
-				throw err;
-			} else {
+			} else if (this.parentSubscriber.syncErrorThrowable) {
 				this.parentSubscriber.syncErrorValue = err;
 				this.parentSubscriber.syncErrorThrown = true;
 				this.unsubscribe();
+			} else {
+				this.unsubscribe();
+
+				throw err;
 			}
 		}
 	}
 
 	complete() {
 		if (!this.stopped) {
-			if (this._complete) {
-				const wrappedComplete = () => this.context._complete();
-				if (!this.parentSubscriber.syncErrorThrowable) {
-					this.tryOrUnsub(wrappedComplete);
+			if (this.innerComplete) {
+				const wrappedComplete = () => this.context.innerComplete();
+
+				if (this.parentSubscriber.syncErrorThrowable) {
+					this.tryOrSetError(this.parentSubscriber, wrappedComplete);
 					this.unsubscribe();
 				} else {
-					this.tryOrSetError(this.parentSubscriber, wrappedComplete);
+					this.tryOrUnsub(wrappedComplete);
 					this.unsubscribe();
 				}
 			} else {
@@ -332,6 +348,7 @@ class SafeSubscriber extends Subscriber {
 			fn.call(this.context, value);
 		} catch (err) {
 			this.unsubscribe();
+
 			throw err;
 		}
 	}
@@ -342,13 +359,16 @@ class SafeSubscriber extends Subscriber {
 		} catch (err) {
 			parent.syncErrorValue = err;
 			parent.syncErrorThrown = true;
+
 			return true;
 		}
+
 		return false;
 	}
 
-	_unsubscribe() {
+	internalUnsubscribe() {
 		const {parentSubscriber} = this;
+
 		this.context = null;
 		this.parentSubscriber = null;
 		parentSubscriber.unsubscribe();
@@ -356,24 +376,24 @@ class SafeSubscriber extends Subscriber {
 }
 
 export class OuterSubscriber extends Subscriber {
-	get [Symbol.toStringTag]() {
-		return 'OuterSubscriber';
-	}
+	[Symbol.toStringTag] = 'OuterSubscriber';
 
 	notifyNext(outerValue, innerValue) {
 		this.destination.next(innerValue);
 	}
 
-	notifyError(error, innerSub) {
+	notifyError(error) {
 		this.destination.error(error);
 	}
 
-	notifyComplete(innerSub) {
+	notifyComplete() {
 		this.destination.complete();
 	}
 }
 
 export class InnerSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'InnerSubscriber';
+
 	constructor(parent, outerValue, outerIndex) {
 		super();
 		this.parent = parent;
@@ -382,20 +402,16 @@ export class InnerSubscriber extends Subscriber {
 		this.index = 0;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'InnerSubscriber';
+	innerNext(value) {
+		this.parent.notifyNext(this.outerValue, value, this.outerIndex, this.index += 1, this);
 	}
 
-	_next(value) {
-		this.parent.notifyNext(this.outerValue, value, this.outerIndex, this.index++, this);
-	}
-
-	_error(error) {
+	innerError(error) {
 		this.parent.notifyError(error, this);
 		this.unsubscribe();
 	}
 
-	_complete() {
+	innerComplete() {
 		this.parent.notifyComplete(this);
 		this.unsubscribe();
 	}

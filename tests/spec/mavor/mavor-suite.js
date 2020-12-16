@@ -1,4 +1,4 @@
-import { Suite } from '../../api/suite.js';
+import {Suite} from '../../api/suite.js';
 import * as mavor from './mavor.js';
 
 export class MavorSuite extends Suite {

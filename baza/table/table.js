@@ -1,4 +1,4 @@
-import { CssStatic, HtmlStatic } from '../../fiu/js/utils.js';
+import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
 import BazaComponent from '../baza-component.js';
 
 const html = new HtmlStatic(`<table>
@@ -31,7 +31,10 @@ table tbody tr:last-child td {border-bottom:none;}
 table tbody tr.hidden {display:none;}
 table tfoot {display:none;}
 table tfoot.show {display:table-footer-group;}
-.button {text-decoration:none;display:inline-block;margin:0 15px 0 0;transition:.3s all ease;color:rgba(255, 255, 255, 1);font-size:14px;line-height:20px;font-weight:bold;padding:6px 12px;border:none;cursor:pointer;border-radius:2px;}
+.button {
+	text-decoration:none;display:inline-block;margin:0 15px 0 0;transition:.3s all ease;color:rgba(255, 255, 255, 1);font-size:14px;
+	line-height:20px;font-weight:bold;padding:6px 12px;border:none;cursor:pointer;border-radius:2px;
+}
 .button-small {padding:4px 8px;}`);
 
 export default class BazaTableComponent extends BazaComponent {
@@ -43,25 +46,18 @@ export default class BazaTableComponent extends BazaComponent {
 		css,
 	];
 	static registerComponents = [];
-
 	thead;
 	tbody;
 	tfoot;
 
-	constructor() {
-		super();
-	}
-
-	unload() {
-	}
-
 	onTemplateLoaded() {
 		const header = this.attribute('header');
 
-		if (!!header) {
+		if (header) {
 			this.thead.classList.add('show');
-			header.split(',').forEach((headerText, index) => {
+			header.split(',').forEach((headerText) => {
 				const heading = this.newElement('th');
+
 				heading.textContent = headerText.trim();
 				this.thead.querySelector('tr').append(heading);
 			});
@@ -70,19 +66,20 @@ export default class BazaTableComponent extends BazaComponent {
 
 	updateBody(data) {
 		this.tbody.innerHTML = '';
-		data.forEach((dataRow, index) => {
+		data.forEach((dataRow) => {
 			const row = this.newElement('tr');
 
-			dataRow.forEach((dataCell, index) => {
+			dataRow.forEach((dataCell) => {
 				const cell = this.newElement('td');
 
 				if (Array.isArray(dataCell)) {
-					dataCell.forEach((part, index) => {
+					dataCell.forEach((part) => {
 						cell.append(part);
 					});
 				} else {
 					cell.append(dataCell);
 				}
+
 				row.append(cell);
 			});
 

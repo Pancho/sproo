@@ -1,6 +1,5 @@
-'use strict';
 import App from './app.js';
-import { Utils } from './utils.js';
+import {Utils} from './utils.js';
 
 /* I wanted to have this "middleman", due to JS not supporting real decorators yet, to avoid boilerplate in the actual
 * component/element class implementation. I insist on not using babels and some obscure pollyfills, to achieve decorator like effect,
@@ -12,7 +11,7 @@ import { Utils } from './utils.js';
 *
 * Let's suppose you wanted to have a custom html element with a tag named "navigation". First you would have to define a new class, as such:
 *
-* class Navigation extends HTMLElement { // What a time we live in... JS has classes now, and COVID-19 is reducing us into 17th century plebs.
+* class Navigation extends HTMLElement { // What a time to live in... JS has classes now, and COVID-19 has reduced us to 17th century plebs.
 *       constructor() {
 *           super(); // Yes, semicolons are super important!
 *       }
@@ -34,7 +33,7 @@ import { Utils } from './utils.js';
 *               template = '<div><p>Some text in my awesome component</p></div>',
 *               someElement = document.createElement('some');
 *
-*           style.textContent = '\/* a bunch of css... that gets inserted into every single instance of this component class... neat, possibly a single large css or generated poop from a scss file *\/';
+*           style.textContent = '\/* a bunch of css... *\/'';
 *           shadowRoot.append(style);
 *           shadowRoot.append(someElement);
 *           // or
@@ -136,29 +135,29 @@ import { Utils } from './utils.js';
 * import Component from './sablono/fiu/component.js';
 *
 * export class TagComponent extends Component {
-* 	static tagName = 'tag';
-* 	static template = 'domain/tag';
-* 	static stylesheets = [
-* 		'reset',
-* 		'domain/tag',
-* 	];
+*     static tagName = 'tag';
+*     static template = 'domain/tag';
+*     static stylesheets = [
+*         'reset',
+*         'domain/tag',
+*     ];
 *
-* 	constructor(params) { // For params, see sablono/fiu/router.js
-* 		super();
-*       // Your code here
-* 	} // You may omit the constructor alltogether
+*     constructor(params) { // For params, see sablono/fiu/router.js
+*         super();
+*         // Your code here
+*     } // You may omit the constructor alltogether
 * }
 */
 
 
-const CLEAN_TRAILING_SLASH = new RegExp(/\/+$/);
-const CLEAN_LEADING_SLASH = new RegExp(/^\/+/);
+const CLEAN_TRAILING_SLASH = /\/+$/u,
+	CLEAN_LEADING_SLASH = /^\/+/u;
 
 
 export default class Component extends HTMLElement {
+	[Symbol.toStringTag] = 'Component';
 	// Index of bound elements. Can change during runtime as it gets updated (or rather overwritten) on every mutation.
 	bindingIndex = {};
-
 	// Promise that's resolved when the onTemplateLoaded has already been executed
 	templateLoaded;
 
@@ -172,32 +171,29 @@ export default class Component extends HTMLElement {
 
 		// Template context, from which the template gets updated
 		this.templateContext = {};
+		this.attachShadow({mode: 'open'});
 
-		this.attachShadow({
-			mode: 'open',
-		});
+		const importPromises = [],
+			templateReady = new Promise((resolve) => {
+				if (this.constructor.template) {
+					Utils.getTemplateHTML(this.constructor.template, resolve);
+				} else {
+					resolve();
+				}
+			}),
+			styleSheetPromises = [];
 
-		const templateReady = new Promise(resolve => {
-			if (!!this.constructor.template) {
-				Utils.getTemplateHTML(this.constructor.template, resolve);
-			} else {
-				resolve();
-			}
-		});
-
-		const styleSheetPromises = [];
-		if (!!this.constructor.stylesheets) {
-			this.constructor.stylesheets.forEach(stylesheet => {
+		if (this.constructor.stylesheets) {
+			this.constructor.stylesheets.forEach((stylesheet) => {
 				styleSheetPromises.push(
-					new Promise(resolve =>
-						Utils.getCSS(typeof stylesheet === 'string' ? `${App.staticRoot}${stylesheet}` : stylesheet, resolve),
-					),
+					new Promise((resolve) => {
+						Utils.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
+					}),
 				);
 			});
 		}
 
-		const importPromises = [];
-		if (!!this.constructor.registerComponents) {
+		if (this.constructor.registerComponents) {
 			this.constructor.registerComponents.forEach((component) => {
 				importPromises.push(import(component));
 			});
@@ -205,27 +201,7 @@ export default class Component extends HTMLElement {
 
 		this.app = App.instance;
 
-		// this.templateLoaded = new Promise(resolve => {
-		// 	templateReady.then(templateDocument => {
-		// 		if (templateDocument instanceof Node) {
-		// 			this.shadowRoot.append(templateDocument);
-		// 			this.processFiuAttributes(this.shadowRoot);
-		// 			this.updatePageLinks(this.shadowRoot);
-		// 			Promise.all([...styleSheetPromises]).then(([...stylesheets]) => {
-		// 				this.shadowRoot.adoptedStyleSheets = [...stylesheets];
-		// 			});
-		// 			Promise.all(importPromises).then(([...componentModules]) => {
-		// 				componentModules
-		// 					.filter(module => !customElements.get(module.default.tagName))
-		// 					.forEach(module => customElements.define(module.default.tagName, module.default));
-		// 				this.onTemplateLoaded();
-		// 				resolve();
-		// 			});
-		// 		}
-		// 	});
-		// });
-
-		this.templateLoaded = new Promise(resolve => {
+		this.templateLoaded = new Promise((resolve) => {
 			Promise.all([templateReady, ...styleSheetPromises]).then(([templateDocument, ...stylesheets]) => {
 				if (templateDocument instanceof Node) {
 					this.shadowRoot.adoptedStyleSheets = [...stylesheets];
@@ -234,8 +210,8 @@ export default class Component extends HTMLElement {
 					this.updatePageLinks(this.shadowRoot);
 					Promise.all(importPromises).then(([...componentModules]) => {
 						componentModules
-							.filter(module => !customElements.get(module.default.tagName))
-							.forEach(module => customElements.define(module.default.tagName, module.default));
+							.filter((module) => !customElements.get(module.default.tagName))
+							.forEach((module) => customElements.define(module.default.tagName, module.default));
 						this.onTemplateLoaded();
 						resolve();
 					});
@@ -243,7 +219,7 @@ export default class Component extends HTMLElement {
 			});
 		});
 
-		if (!!App.loggerFactory) {
+		if (App.loggerFactory) {
 			this.logger = App.loggerFactory.getLogger(this.constructor);
 		}
 	}
@@ -251,10 +227,11 @@ export default class Component extends HTMLElement {
 	updatePageLinks(doc) {
 		doc.addEventListener('click', (event) => {
 			let target = event.target;
-			for (; !!target && !!target.parentElement; target = target.parentNode) {
+
+			for (; Boolean(target) && Boolean(target.parentElement); target = target.parentNode) {
 				if (target.matches('[route]')) {
 					if ((event.ctrlKey || event.metaKey) && event.target.tagName.toLowerCase() === 'a') {
-						return false;  // Could do preventDefault, but would return either way, so this is actually perfectly fine
+						return false; // Could do preventDefault, but would return either way, so this is actually perfectly fine
 					}
 
 					const location = target.getAttribute('route');
@@ -265,39 +242,44 @@ export default class Component extends HTMLElement {
 							location
 								.replace(CLEAN_TRAILING_SLASH, '')
 								.replace(CLEAN_LEADING_SLASH, '/'),
-							{...target.dataset},  // "cast" to dict
+							{...target.dataset}, // "cast" to dict
 						);
 					}
+
 					break;
 				}
 			}
+
+			return false; // Do not allow the click to the element actually do anything
 		});
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'Component';
-	}
-
 	processFiuAttributes(templateDocument) {
-		templateDocument.querySelectorAll('*').forEach(refElement => {
+		templateDocument.querySelectorAll('*').forEach((refElement) => {
 			const attributeNames = refElement.getAttributeNames();
+
 			if (attributeNames.length > 0) {
-				attributeNames.forEach(attributeName => {
+				attributeNames.forEach((attributeName) => {
 					if (attributeName === 'fiu-ref') {
 						this[refElement.getAttribute(attributeName)] = refElement;
 					} else if (attributeName.startsWith('(') && attributeName.endsWith(')')) {
 						const eventName = attributeName.replace('(', '').replace(')', '').trim(),
 							handlerName = refElement.getAttribute(attributeName);
+
 						if (typeof this[handlerName] === 'function') {
-							refElement.addEventListener(eventName, ev => this[handlerName].call(this, ev));
+							refElement.addEventListener(eventName, (ev) => {
+								this[handlerName](ev);
+							});
 						} else {
-							console.log(`Handler ${handlerName} not present on component`);
+							console.log(`Handler ${ handlerName } not present on component`);
 						}
 					} else if (attributeName.startsWith('[') && attributeName.endsWith(']')) {
 						let propertyName = attributeName.replace('[', '').replace(']', '').trim();
+
 						if (propertyName.includes('.')) {
 							propertyName = propertyName.replace('.', '\\.');
 						}
+
 						this.bindingIndex[refElement.getAttribute(attributeName)] = propertyName;
 					}
 				});
@@ -311,7 +293,7 @@ export default class Component extends HTMLElement {
 
 	set context(change) {
 		if (!Component.isObject(change)) {
-			throw Error(`Context has to be updated with an object. Got ${change}`);
+			throw Error(`Context has to be updated with an object. Got ${ change }`);
 		}
 
 		this.templateContext = {
@@ -321,34 +303,31 @@ export default class Component extends HTMLElement {
 
 		Object.entries(change).forEach(([key, value]) => {
 			const selectorKeys = Component.isObject(value) ? [key, ...Component.spreadPath(key, value).flat()] : [key];
-			selectorKeys.forEach(selectorKey => {
-				if (selectorKey in this.bindingIndex) {
-					let innerAttributeName = this.bindingIndex[selectorKey];
 
-					this.getElements(`[\\[${innerAttributeName}\\]="${selectorKey}"]`).forEach(elm => {
+			selectorKeys.forEach((selectorKey) => {
+				if (selectorKey in this.bindingIndex) {
+					const innerAttributeName = this.bindingIndex[selectorKey];
+
+					this.getElements(`[\\[${ innerAttributeName }\\]="${ selectorKey }"]`).forEach((elm) => {
 						const boundValue = selectorKey.split('.').reduce((blob, prevKey) => blob[prevKey], change);
+
 						if (innerAttributeName.includes('.')) {
 							const split = innerAttributeName.split('\\.');
+
 							if (split[0] === 'attr') {
 								elm.setAttribute(split[1], boundValue);
 							} else if (split[0] === 'style') {
 								elm.style[split[1]] = boundValue;
 							}
+						} else if (elm instanceof Component) {
+							elm.templateLoaded.then(() => {
+								elm.context = {[innerAttributeName]: boundValue};
+								elm[innerAttributeName] = boundValue;
+							});
+						} else if (Utils.propertyNamesMap[innerAttributeName]) {
+							elm[Utils.propertyNamesMap[innerAttributeName]] = boundValue;
 						} else {
-							if (elm instanceof Component) {
-								elm.templateLoaded.then(() => {
-									elm.context = {
-										[innerAttributeName]: boundValue,
-									};
-									elm[innerAttributeName] = boundValue;
-								});
-							} else {
-								if (!!Utils.propertyNamesMap[innerAttributeName]) {
-									elm[Utils.propertyNamesMap[innerAttributeName]] = boundValue;
-								} else {
-									elm[innerAttributeName] = boundValue;
-								}
-							}
+							elm[innerAttributeName] = boundValue;
 						}
 					});
 				}
@@ -374,11 +353,13 @@ export default class Component extends HTMLElement {
 	* If you supply both the name and value, this method will set this attribute for this component
 	*/
 	attribute(name, value) {
-		if (value === undefined) {
-			return this.getAttribute(name);
-		} else {
+		if (value) {
 			this.setAttribute(name, value);
+
+			return value;
 		}
+
+		return this.getAttribute(name);
 	}
 
 	/*
@@ -401,7 +382,7 @@ export default class Component extends HTMLElement {
 	newElement(tagName, attributes) {
 		const newElement = document.createElement(tagName);
 
-		Object.entries(attributes || {}).forEach((entry, index) => {
+		Object.entries(attributes || {}).forEach((entry) => {
 			newElement.setAttribute(...entry);
 		});
 
@@ -412,6 +393,7 @@ export default class Component extends HTMLElement {
 		if (!this.parentElement) {
 			return;
 		}
+
 		this.parentElement.removeChild(this);
 	}
 
@@ -421,20 +403,26 @@ export default class Component extends HTMLElement {
 
 	getStyleElement() {
 		let style = this.getElement('style');
+
 		if (!style) {
 			style = this.newElement('style');
 			this.shadowRoot.appendChild(style);
 		}
+
 		return style;
 	}
 
 	static spreadPath(key, value) {
-		return Object.keys(value).map(innerKey => {
+		return Object.keys(value).map((innerKey) => {
 			if (Component.isObject(value[innerKey])) {
-				return [`${key}.${innerKey}`, Component.spreadPath(innerKey, value[innerKey]).map(newKey => `${key}.${newKey}`)].flat();
-			} else {
-				return `${key}.${innerKey}`;
+				return [
+					`${ key }.${ innerKey }`, Component.spreadPath(innerKey, value[innerKey]).map(
+						(newKey) => `${ key }.${ newKey }`
+					),
+				].flat();
 			}
+
+			return `${ key }.${ innerKey }`;
 		});
 	}
 

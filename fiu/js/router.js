@@ -39,7 +39,7 @@
 * },
 * {
 *   path: '/main',
-*	component: MainComponent
+*   component: MainComponent
 * },
 * {
 * ...
@@ -63,7 +63,10 @@
 *
 * Do not try to make a path like '' or '/', because those (or that) are a special case called homePage and are reserved for that.
 */
+
 export default class Router {
+	[Symbol.toStringTag] = 'Router';
+	static instance;
 	routeRoot = null;
 	routes = [];
 	lastRouteResolved = {};
@@ -71,10 +74,8 @@ export default class Router {
 	notFoundRoute = null;
 	destroyed = false;
 
-	static instance;
-
 	constructor(routeRoot, homePage, notFound, routes, authenticationUrl) {
-		if (!!Router.instance) {
+		if (Router.instance) {
 			throw new Error('Only one instance of Router allowed');
 		}
 
@@ -87,41 +88,43 @@ export default class Router {
 
 		this.homePageRoute = {
 			handler: async () => {
-				return RouterUtils.inject(homePage.component);
+				await RouterUtils.inject(homePage.component);
 			},
 		};
 		this.notFoundRoute = {
 			handler: async () => {
-				return RouterUtils.inject(notFound.component);
+				await RouterUtils.inject(notFound.component);
 			},
 		};
 
 		if (Array.isArray(routes)) {
-			routes.forEach((route, index) => {
+			routes.forEach((route) => {
 				this.add(
 					route.path,
-					async params => {
-						params = params || [];
-						if (!!route.guard) {
-							return import(route.guard).then(guardModule => {
-								const guard = new guardModule.default();
-								return guard.guard(this, route).then(async result => {
-									return RouterUtils.inject(route.component, ...params);
+					(params) => {
+						const componentParams = params || [];
+
+						if (route.guard) {
+							return import(route.guard).then((guardModule) => {
+								const guard = new guardModule.default(this, route);
+
+								return guard.guard(this, route).then((result) => {
+									if (result) {
+										return RouterUtils.inject(route.component, ...componentParams);
+									}
+
+									return false;
 								});
 							});
-						} else {
-							return RouterUtils.inject(route.component, ...params);
 						}
+
+						return RouterUtils.inject(route.component, ...componentParams);
 					},
 				);
 			});
 		}
 
 		this.resolve();
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'Router';
 	}
 
 	destroy() {
@@ -132,33 +135,38 @@ export default class Router {
 	}
 
 	add(route, handler = null) {
+		let internalRoute = '';
+
 		if (typeof route === 'string') {
-			route = encodeURI(route);
+			internalRoute = encodeURI(route);
 		}
+
 		this.routes.push({
-			path: route,
+			path: internalRoute,
 			handler: handler,
 		});
 	}
 
-	async navigate(location, data) {
-		data = data || {};
-		location = location || '';
+	navigate(location, data) {
+		const internalData = data || {},
+			internalLocation = location || '';
+
 		window.history.pushState(
-			data,
+			internalData,
 			// Here's the thing about this param... this would replace the title tag, so each page could have a unique
-			// title, but of all the browsers, only Safari uses this, and I don't want to test it, to see if this is
-			// even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
-			// for the SEO anyway.
+			// Title, but of all the browsers, only Safari uses this, and I don't want to test it, to see if this is
+			// Even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
+			// For the SEO anyway.
 			'',
-			(`${this.routeRoot}/${location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')}`).replace(/([^:])(\/{2,})/g, '$1/'),
+			`${ this.routeRoot }/${ internalLocation.replace(RouterUtils.CLEAN_LEADING_SLASH, '/') }`.replace(/([^:])(\/{2,})/gu, '$1/'),
 		);
+
 		return this.resolve();
 	}
 
 	match(path) {
 		return this.routes
-			.map(route => {
+			.map((route) => {
 				const {regexp, paramNames} = RouterUtils.replaceDynamicURLParts(RouterUtils.clean(route.path)),
 					match = path.replace(RouterUtils.CLEAN_LEADING_SLASH, '/').match(regexp),
 					params = RouterUtils.regExpResultToParams(match, paramNames);
@@ -168,51 +176,49 @@ export default class Router {
 					route: route,
 					params: params,
 				} : false;
-			}).filter(match => match)[0];
+			}).filter((match) => match)[0];
 	}
 
-	async resolve(current) {
+	resolve(current) {
 		const url = current || RouterUtils.clean(window.location.href),
-			path = RouterUtils.splitURL(url.replace(this.routeRoot, ''));
+			path = RouterUtils.splitURL(url.replace(this.routeRoot, '')),
+			match = this.match(path);
 
-		if (!!this.lastRouteResolved && this.lastRouteResolved.path === path) {
+		if (Boolean(this.lastRouteResolved) && this.lastRouteResolved.path === path) {
 			return false;
 		}
 
-		const match = this.match(path);
-
-		if (!!match) {
+		if (match) {
 			this.lastRouteResolved = {
 				path: path,
 				params: match.params,
 			};
 
 			return match.route.handler(match.params);
-		} else if (!!this.homePageRoute && (path === '' || path === '/')) {
-			this.lastRouteResolved = {
-				path: path,
-			};
+		} else if (Boolean(this.homePageRoute) && (path === '' || path === '/')) {
+			this.lastRouteResolved = {path: path};
+
 			return this.homePageRoute.handler();
-		} else if (!!this.notFoundRoute) {
-			this.lastRouteResolved = {
-				path: path,
-			};
+		} else if (this.notFoundRoute) {
+			this.lastRouteResolved = {path: path};
+
 			return this.notFoundRoute.handler();
 		}
+
 		return false;
 	}
 }
 
 class RouterUtils {
-	static DEPTH_TRAILING_SLASH = new RegExp(/\/$/);
-	static CLEAN_TRAILING_SLASH = new RegExp(/\/+$/);
-	static CLEAN_LEADING_SLASH = new RegExp(/^\/+/);
-	static PARAMETER_REGEXP = new RegExp(/([:*])(\w+)/g);
-	static WILDCARD_REGEXP = new RegExp(/\*/g);
-	static SPLIT_GET_PARAMETERS = new RegExp(/\?(.*)?$/);
-	static REPLACE_VARIABLE_REGEXP = '([^\/]+)';
+	static DEPTH_TRAILING_SLASH = /\/$/u;
+	static CLEAN_TRAILING_SLASH = /\/+$/u;
+	static CLEAN_LEADING_SLASH = /^\/+/u;
+	static PARAMETER_REGEXP = /([:*])(\w+)/gu;
+	static WILDCARD_REGEXP = /\*/gu;
+	static SPLIT_GET_PARAMETERS = /\?(.*)?$/u;
+	static REPLACE_VARIABLE_REGEXP = '([^/]+)';
 	static REPLACE_WILDCARD = '(?:.*)';
-	static FOLLOWED_BY_SLASH_REGEXP = '(?:\/$|$)';
+	static FOLLOWED_BY_SLASH_REGEXP = '(?:/$|$)';
 
 	static clean(url) {
 		return url.replace(RouterUtils.CLEAN_TRAILING_SLASH, '').replace(RouterUtils.CLEAN_LEADING_SLASH, '^/').split('#')[0];
@@ -224,7 +230,7 @@ class RouterUtils {
 
 	static replaceDynamicURLParts(route) {
 		const paramNames = [];
-		let regexp;
+		let regexp = null;
 
 		if (route instanceof RegExp) {
 			regexp = route;
@@ -233,11 +239,14 @@ class RouterUtils {
 				route
 					.replace(RouterUtils.PARAMETER_REGEXP, function (full, dots, name) {
 						paramNames.push(name);
+
 						return RouterUtils.REPLACE_VARIABLE_REGEXP;
 					})
 					.replace(RouterUtils.WILDCARD_REGEXP, RouterUtils.REPLACE_WILDCARD) + RouterUtils.FOLLOWED_BY_SLASH_REGEXP,
+				'u',
 			);
 		}
+
 		return {
 			regexp,
 			paramNames,
@@ -255,12 +264,12 @@ class RouterUtils {
 
 		return match
 			.slice(1, match.length)
-			.reduce((params, value, index) => {
-				if (params === null) {
-					params = [];
-				}
-				params.push(decodeURIComponent(value));
-				return params;
+			.reduce((params, value) => {
+				const result = params ? params : [];
+
+				result.push(decodeURIComponent(value));
+
+				return result;
 			}, null);
 	}
 
@@ -272,7 +281,7 @@ class RouterUtils {
 		return RouterUtils.getUrlDepth(urlB) - RouterUtils.getUrlDepth(urlA);
 	}
 
-	static async inject(component, ...params) {
+	static inject(component, ...params) {
 		const outlet = document.querySelector('router-outlet');
 
 		if (!outlet) {
@@ -283,19 +292,23 @@ class RouterUtils {
 			if (outlet.firstChild.unload) {
 				outlet.firstChild.unload();
 			}
+
 			outlet.removeChild(outlet.firstChild);
 		}
-		return new Promise(resolve => {
-			import(component).then(module => {
+
+		return new Promise((resolve) => {
+			import(component).then((module) => {
 				if (!module || !module.default) {
-					throw new Error(`We cannot render a component from module ${module}`);
+					throw new Error(`We cannot render a component from module ${ module }`);
 				}
+
 				if (!customElements.get(module.default.tagName)) {
 					customElements.define(module.default.tagName, module.default);
 				}
+
 				outlet.appendChild(new module.default(...params));
 				resolve();
-			}).catch(error => {
+			}).catch((error) => {
 				throw new Error(error);
 			});
 		});

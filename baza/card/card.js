@@ -1,4 +1,4 @@
-import { CssStatic, HtmlStatic } from '../../fiu/js/utils.js';
+import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
 import BazaComponent from '../baza-component.js';
 
 const html = new HtmlStatic(`<h1 fiu-ref="titleElement"></h1>
@@ -17,16 +17,24 @@ export default class BazaCardComponent extends BazaComponent {
 		css,
 	];
 	static registerComponents = [];
-
 	titleElement;
 
 	onTemplateLoaded() {
 		const elementTitle = this.getAttribute('title');
+
 		if (elementTitle) {
 			this.titleElement.textContent = this.getAttribute('title');
 		} else {
 			this.titleElement.remove();
 		}
+	}
+
+	get title() {
+		if (this.titleElement) {
+			return this.titleElement.textContent;
+		}
+
+		return '';
 	}
 
 	set title(title) {

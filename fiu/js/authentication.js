@@ -3,16 +3,13 @@
  * don't worry). Such as it is, this implementation will not do a damn thing, just pass everything through.
  */
 export default class Authentication {
+	[Symbol.toStringTag] = 'Authentication';
 	constructor() {
-		if (!!Authentication.instance) {
+		if (Authentication.instance) {
 			throw new Error('Only one instance of Authentication allowed');
 		}
 
 		Authentication.instance = this;
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'Authentication';
 	}
 
 	/**

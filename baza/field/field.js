@@ -1,4 +1,4 @@
-import { CssStatic, HtmlStatic } from '../../fiu/js/utils.js';
+import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
 import BazaComponent from '../baza-component.js';
 
 const html = new HtmlStatic(`<label fiu-ref="label"></label>
@@ -15,7 +15,9 @@ label span.far {cursor:pointer;}
 .border-red-70 {border-color:rgba(211,47,47,1.0);}
 .white {color:rgba(255,255,255,1.0);}
 ::slotted(*:not(select)), ::slotted(*:not(input[type="checkbox"])) {-webkit-appearance:none;-moz-appearance:none;appearance:none;}
-::slotted(input), ::slotted(select), ::slotted(textarea) {border-radius:0;box-shadow:none;width:calc(100% - 26px);height:20px;padding:6px 12px;font-size:14px;border-width:1px;border-style:solid;}
+::slotted(input), ::slotted(select), ::slotted(textarea) {
+	border-radius:0;box-shadow:none;width:calc(100% - 26px);height:20px;padding:6px 12px;font-size:14px;border-width:1px;border-style:solid;
+}
 ::slotted(select) {width:100%;height:34px;}
 ::slotted(textarea) {min-height:60px;resize:vertical;font-family:inherit;}
 ::slotted(input:focus), ::slotted(select:focus) {border-color:inherit;}
@@ -39,15 +41,12 @@ export default class BazaFieldComponent extends BazaComponent {
 		'text': '/baza/field/lib/text.js',
 		'password': '/baza/field/lib/password.js',
 	};
-
 	// Internals to mimic a form field
 	internals;
 	internalValue;
-
 	label;
 	help;
 	errors;
-	control;
 
 	constructor() {
 		super();
@@ -55,29 +54,11 @@ export default class BazaFieldComponent extends BazaComponent {
 	}
 
 	unload() {
+		this.eslintPlaceholder = 0;
 	}
 
 	onTemplateLoaded() {
-		this.control = this.querySelector(':scope > *');
-
-		if (!this.control) {
-			throw new Error('You need to provide the actual HTML control (input, select...) that will provide the user input interface. This is just a wrapper. Be aware, that you can and may just forgo these custom elements and just use plain ol\' forms without any special handling.');
-		}
-
-		if (!this.form) {
-			throw new Error('You cannot place a baza-field into an element that\'s not a baza-form. Future is awesome, but there is always a price to be paid.');
-		}
-
-		this.control.addEventListener('keyup', function (e) {
-			if (e.keyCode === 13) {
-				this.form.triggerSubmit();
-			}
-		});
-		this.label.textContent = this.attribute('label');
-		// this.label.addEventListener('click', event => {
-		// 	control.focus();
-		// });
-		this.label.setAttribute('for', this.attribute('label-for'));
+		this.eslintPlaceholder = 0;
 	}
 
 	get value() {
@@ -88,5 +69,7 @@ export default class BazaFieldComponent extends BazaComponent {
 		this.internalValue = value;
 	}
 
-	get form() { return this.internals.form; }
+	get form() {
+		return this.internals.form;
+	}
 }

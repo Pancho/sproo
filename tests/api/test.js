@@ -4,8 +4,38 @@ import Http from '../../fiu/js/http.js';
 import Mavor from '../../fiu/js/mavor.js';
 import Router from '../../fiu/js/router.js';
 
+function deepEquals(obj1, obj2) {
+	if (obj1 === obj2) {
+		return true;
+	}
+
+	if (obj1 instanceof Date && obj2 instanceof Date) {
+		return obj1.getTime() === obj2.getTime();
+	}
+
+	if (!obj1 || !obj2 || typeof obj1 !== 'object' && typeof obj2 !== 'object') {
+		return obj1 === obj2;
+	}
+
+	if (obj1.constructor !== obj2.constructor) {
+		return false;
+	}
+
+	if (obj1.constructor !== Object || obj2.constructor !== Object) {
+		return false;
+	}
+
+	const keys = Object.keys(obj1);
+
+	if (keys.length !== Object.keys(obj2).length) {
+		return false;
+	}
+
+	return keys.every((k) => deepEquals(obj1[k], obj2[k]));
+}
 
 export class Test {
+	[Symbol.toStringTag] = 'Test';
 	name;
 	successMessage;
 	failedMessage;
@@ -17,34 +47,41 @@ export class Test {
 
 	constructor(name, successMessage, failedMessage) {
 		this.name = name;
+
 		if (successMessage === failedMessage) {
 			throw new Error('Test cannot have same message for success and fail.');
 		}
+
 		this.successMessage = successMessage;
 		this.failedMessage = failedMessage;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'Test';
-	}
-
-	async assertEquals(value, expectedValue) {
-		return new Promise((resolve, reject) => {
+	assertEquals(value, expectedValue) {
+		return new Promise((resolve) => {
 			if (value === expectedValue) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Equals] Value <span class="value">"${value}"</span> equals <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${
+					value
+				}"</span> equals <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Equals] Value <span class="value">"${value}"</span> does not equal <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${
+					value
+				}"</span> does not equal <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
-	async assertArraysEquals(value, expectedValue) {
-		return new Promise((resolve, reject) => {
+	assertArraysEquals(value, expectedValue) {
+		return new Promise((resolve) => {
 			if (
 				Array.isArray(value) &&
 				Array.isArray(expectedValue) &&
@@ -53,187 +90,266 @@ export class Test {
 			) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Equals] Value <span class="value">"${value}"</span> equals <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${
+					value
+				}"</span> equals <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Equals] Value <span class="value">"${value}"</span> does not equal <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${
+					value
+				}"</span> does not equal <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
-	async assertArraysContentEquals(value, expectedValue) {
+	assertArraysContentEquals(value, expectedValue) {
 		// The only difference between this method and the assertArraysEquals is that we don't care for the original order of elements
-		// and just check whether both have the same. So to use the same logic as in the assertArraysEquals, we just need to sort both
-		// arrays first, and the rest is the same.
+		// And just check whether both have the same. So to use the same logic as in the assertArraysEquals, we just need to sort both
+		// Arrays first, and the rest is the same.
 		value.sort();
 		expectedValue.sort();
+
 		return this.assertArraysEquals(value, expectedValue);
 	}
 
-	async assertObjectsEquals(value, expectedValue) {
-		return new Promise((resolve, reject) => {
+	assertObjectsEquals(value, expectedValue) {
+		return new Promise((resolve) => {
 			if (deepEquals(value, expectedValue)) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Equals] Value <span class="value">"${JSON.stringify(value)}"</span> equals <span class="expected-value">"${JSON.stringify(expectedValue)}"</span>`;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${
+					JSON.stringify(value)
+				}"</span> equals <span class="expected-value">"${
+					JSON.stringify(expectedValue)
+				}"</span>`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Equals] Value <span class="value">"${JSON.stringify(value)}"</span> does not equal <span class="expected-value">"${JSON.stringify(expectedValue)}"</span>`;
+				this.resultReport = `[Assert Equals] Value <span class="value">"${
+					JSON.stringify(value)
+				}"</span> does not equal <span class="expected-value">"${
+					JSON.stringify(expectedValue)
+				}"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
-	async assertNotEquals(value, expectedValue) {
-		return new Promise((resolve, reject) => {
-			if (value !== expectedValue) {
-				this.succeeded = true;
-				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Not Equals] Value <span class="value">"${value}"</span> does not equals <span class="expected-value">"${expectedValue}"</span>`;
-			} else {
+	assertNotEquals(value, expectedValue) {
+		return new Promise((resolve) => {
+			if (value === expectedValue) {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Not Equals] Value <span class="value">"${value}"</span> equals <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Not Equals] Value <span class="value">"${
+					value
+				}"</span> equals <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
+			} else {
+				this.succeeded = true;
+				this.resultMessage = this.successMessage;
+				this.resultReport = `[Assert Not Equals] Value <span class="value">"${
+					value
+				}"</span> does not equals <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
 	assertTrue(value) {
-		return new Promise((resolve, reject) => {
+		return new Promise((resolve) => {
 			if (value === true) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert True] Value <span class="value">"${value}"</span> equals <span class="expected-value">"true"</span>`;
+				this.resultReport = `[Assert True] Value <span class="value">"${
+					value
+				}"</span> equals <span class="expected-value">"true"</span>`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert True] Value <span class="value">"${value}"</span> does not equal <span class="expected-value">"true"</span>`;
+				this.resultReport = `[Assert True] Value <span class="value">"${
+					value
+				}"</span> does not equal <span class="expected-value">"true"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
-	assertFalse() {
-		return new Promise((resolve, reject) => {
+	assertFalse(value) {
+		return new Promise((resolve) => {
 			if (value === false) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert False] Value <span class="value">"${value}"</span> equals <span class="expected-value">"false"</span>`;
+				this.resultReport = `[Assert False] Value <span class="value">"${
+					value
+				}"</span> equals <span class="expected-value">"false"</span>`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert False] Value <span class="value">"${value}"</span> does not equal <span class="expected-value">"false"</span>`;
+				this.resultReport = `[Assert False] Value <span class="value">"${
+					value
+				}"</span> does not equal <span class="expected-value">"false"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
 	assertTruthy(value) {
-		return new Promise((resolve, reject) => {
-			if (!!value) {
+		return new Promise((resolve) => {
+			if (value) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Truthy] Value <span class="value">"${value}"</span> is a truthy value`;
+				this.resultReport = `[Assert Truthy] Value <span class="value">"${ value }"</span> is a truthy value`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Truthy] Value <span class="value">"${value}"</span> is not a truthy value`;
+				this.resultReport = `[Assert Truthy] Value <span class="value">"${ value }"</span> is not a truthy value`;
 			}
+
 			resolve();
 		});
 	}
 
-	assertFalsy() {
-		return new Promise((resolve, reject) => {
-			if (!value) {
-				this.succeeded = true;
-				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Falsy] Value <span class="value">"${value}"</span> is a falsy value`;
-			} else {
+	assertFalsy(value) {
+		return new Promise((resolve) => {
+			if (value) {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Falsy] Value <span class="value">"${value}"</span> is not a falsy value`;
+				this.resultReport = `[Assert Falsy] Value <span class="value">"${ value }"</span> is not a falsy value`;
+			} else {
+				this.succeeded = true;
+				this.resultMessage = this.successMessage;
+				this.resultReport = `[Assert Falsy] Value <span class="value">"${ value }"</span> is a falsy value`;
 			}
+
 			resolve();
 		});
 	}
 
 	assertGt(value, expectedValue) {
-		return new Promise((resolve, reject) => {
+		return new Promise((resolve) => {
 			if (value > expectedValue) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Greater Than] Value <span class="value">"${value}"</span> is greater than <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Greater Than] Value <span class="value">"${
+					value
+				}"</span> is greater than <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Greater Than] Value <span class="value">"${value}"</span> is not greater than <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Greater Than] Value <span class="value">"${
+					value
+				}"</span> is not greater than <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
 	assertGte(value, expectedValue) {
-		return new Promise((resolve, reject) => {
+		return new Promise((resolve) => {
 			if (value >= expectedValue) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Greater Than Or Equal] Value <span class="value">"${value}"</span> is greater than or equal <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Greater Than Or Equal] Value <span class="value">"${
+					value
+				}"</span> is greater than or equal <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Greater Than Or Equal] Value <span class="value">"${value}"</span> is not greater than or equal <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Greater Than Or Equal] Value <span class="value">"${
+					value
+				}"</span> is not greater than or equal <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
 	assertLt(value, expectedValue) {
-		return new Promise((resolve, reject) => {
+		return new Promise((resolve) => {
 			if (value < expectedValue) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Less Than] Value <span class="value">"${value}"</span> is less than <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Less Than] Value <span class="value">"${
+					value
+				}"</span> is less than <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Less Than] Value <span class="value">"${value}"</span> is not less than <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Less Than] Value <span class="value">"${
+					value
+				}"</span> is not less than <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
 	assertLte(value, expectedValue) {
-		return new Promise((resolve, reject) => {
+		return new Promise((resolve) => {
 			if (value <= expectedValue) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Less Than Or Equal] Value <span class="value">"${value}"</span> is lower than or equal <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Less Than Or Equal] Value <span class="value">"${
+					value
+				}"</span> is lower than or equal <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			} else {
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Less Than Or Equal] Value <span class="value">"${value}"</span> is not lower than or equal <span class="expected-value">"${expectedValue}"</span>`;
+				this.resultReport = `[Assert Less Than Or Equal] Value <span class="value">"${
+					value
+				}"</span> is not lower than or equal <span class="expected-value">"${
+					expectedValue
+				}"</span>`;
 			}
+
 			resolve();
 		});
 	}
 
 	assertThrowsError(fn) {
-		return new Promise((resolve, reject) => {
+		return new Promise((resolve) => {
 			try {
 				fn();
 				this.failed = true;
 				this.resultMessage = this.failedMessage;
-				this.resultReport = `[Assert Throws Error] Function <span class="value">"${fn.name}"</span> does not throw an error, but should`;
+				this.resultReport = `[Assert Throws Error] Function <span class="value">"${
+					fn.name
+				}"</span> does not throw an error, but should`;
 			} catch (e) {
 				this.succeeded = true;
 				this.resultMessage = this.successMessage;
-				this.resultReport = `[Assert Throws Error] Function <span class="value">"${fn.name}"</span> did throw an error`;
+				this.resultReport = `[Assert Throws Error] Function <span class="value">"${ fn.name }"</span> did throw an error`;
 			}
+
 			resolve();
 		});
 	}
@@ -243,7 +359,7 @@ export class Test {
 			await this.setup();
 		} catch (e) {
 			this.exception = true;
-			this.resultMessage = 'Unhandled and unexpected exception happened during test setup';
+			this.resultMessage = `Unhandled and unexpected exception happened during test setup ${ e }`;
 			console.error(e);
 		}
 
@@ -251,7 +367,7 @@ export class Test {
 			await this.test();
 		} catch (e) {
 			this.exception = true;
-			this.resultMessage = 'Unhandled and unexpected exception happened during test run';
+			this.resultMessage = `Unhandled and unexpected exception happened during test run ${ e }`;
 			console.error(e);
 		}
 
@@ -259,7 +375,7 @@ export class Test {
 			await this.teardown();
 		} catch (e) {
 			this.exception = true;
-			this.resultMessage = 'Unhandled and unexpected exception happened during test teardown';
+			this.resultMessage = `Unhandled and unexpected exception happened during test teardown ${ e }`;
 			console.error(e);
 		}
 
@@ -270,21 +386,20 @@ export class Test {
 		return this.succeeded || this.failed || this.exception;
 	}
 
-	async setup() {
+	setup() {
 	}
 
-	async test() {
+	test() {
 		throw new Error('You must implement the actual test');
 	}
 
-	async teardown() {
+	teardown() {
 	}
 }
 
 
 export class AppTest extends Test {
 	config;
-	awaitApp;
 	url;
 	app;
 	routerOutlet;
@@ -302,7 +417,7 @@ export class AppTest extends Test {
 		await this.app.ready;
 	}
 
-	async teardown() {
+	teardown() {
 		window.history.pushState(
 			{},
 			'',
@@ -316,8 +431,9 @@ export class AppTest extends Test {
 		Http.instance = null;
 	}
 
-	click(doc, x, y) {
+	static click(doc, x, y) {
 		const mouseClickEvent = document.createEvent('MouseEvents');
+
 		mouseClickEvent.initMouseEvent(
 			'click',
 			true,
@@ -337,27 +453,4 @@ export class AppTest extends Test {
 		);
 		doc.elementFromPoint(x, y).dispatchEvent(mouseClickEvent);
 	}
-}
-
-function deepEquals(obj1, obj2) {
-	if (obj1 === obj2) {
-		return true;
-	}
-	if (obj1 instanceof Date && obj2 instanceof Date) {
-		return obj1.getTime() === obj2.getTime();
-	}
-	if (!obj1 || !obj2 || (typeof obj1 !== 'object' && typeof obj2 !== 'object')) {
-		return obj1 === obj2;
-	}
-	if (obj1.constructor !== obj2.constructor) {
-		return false;
-	}
-	if (obj1.constructor !== Object || obj2.constructor !== Object) {
-		return false;
-	}
-	let keys = Object.keys(obj1);
-	if (keys.length !== Object.keys(obj2).length) {
-		return false;
-	}
-	return keys.every(k => deepEquals(obj1[k], obj2[k]));
 }

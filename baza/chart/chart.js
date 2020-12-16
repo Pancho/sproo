@@ -1,4 +1,4 @@
-import { CssStatic, HtmlStatic } from '../../fiu/js/utils.js';
+import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
 import BazaComponent from '../baza-component.js';
 
 const html = new HtmlStatic(`<h1 fiu-ref="titleElement" [textContent]="title"></h1>
@@ -32,9 +32,7 @@ const html = new HtmlStatic(`<h1 fiu-ref="titleElement" [textContent]="title"></
 			[fiu-ref="svgElement"] .candle-close-body {}
 			[fiu-ref="svgElement"] .candle-wick {}
 			[fiu-ref="svgElement"] .candle-marker {opacity:0;transition:.3s all ease;fill:transparent;}
-
 			[fiu-ref="svgElement"] .border {stroke:purple;}
-
 			.series-0-stop-0 {stop-color:rgba(30,136,229,0.5);}
 			.series-0-stop-1 {stop-color:rgba(30,136,229,0.25);}
 			.series-0-stop-2 {stop-color:rgba(255,255,255,0.1);}
@@ -42,7 +40,6 @@ const html = new HtmlStatic(`<h1 fiu-ref="titleElement" [textContent]="title"></
 			.series-1-stop-1 {stop-color:rgba(255,255,255,0.1);}
 			.series-2-stop-0 {stop-color:rgba(102,187,106,0.5);}
 			.series-2-stop-1 {stop-color:rgba(102,187,106,0.1);}
-
 			[fiu-ref="tooltipElement"] {display:none;position:absolute;padding:5px;width:150px;background:rgba(0,0,0,0.9);}
 			[fiu-ref="tooltipElement"] div {color:rgba(255,255,255,1.0);}
 			[fiu-ref="tooltipElement"] div h6 {font-weight:600;font-size:14px;line-height:20px;}
@@ -58,6 +55,7 @@ export default class BazaChartComponent extends BazaComponent {
 		'/fiu/css/normalize',
 		css,
 	];
+
 	static registerComponents = [];
 	static implementations = {
 		'candlestick': '/baza/chart/lib/candlestick-chart.js',
@@ -66,61 +64,70 @@ export default class BazaChartComponent extends BazaComponent {
 	};
 
 	chartReady;
-
 	titleElement;
 	svgElement;
 	legendElement;
 	tooltipElement;
-
 	internalSeries;
 	internalConfig;
 
+	seriesProperty;
+	configProperty;
+
 	// Bugs
-	// * negative values break everything
 
 	// Attributes
-	// height & width
-	// config setter & rerender
-	// data setter & rerender
+	// Height & width
+	// Config setter & rerender
+	// Data setter & rerender
 
 	// Missing charts:
-	// * geo chart (where to get the map(s)?)
-	// * scatter chart
-	// * histogram
-	// * bar chart
-	// * candlesticks
+	// * Geo chart (where to get the map(s)?)
+	// * Scatter chart
+	// * Histogram
+	// * Bar chart
+	// * Candlesticks
 	// * Line chart & area chart
 	// * Pie & doughnut chart
-	// * gauge
-	// * timeline ?
-
-	unload() {
-	}
+	// * Gauge
+	// * Timeline ?
 
 	onTemplateLoaded() {
 		const elementTitle = this.getAttribute('title');
-		if (!!elementTitle) {
+
+		if (elementTitle) {
 			this.titleElement.textContent = this.getAttribute('title');
 		} else {
 			this.titleElement.remove();
 		}
-		this.chartReady = new Promise(resolve => {
+
+		this.chartReady = new Promise((resolve) => {
 			import(BazaChartComponent.implementations[this.attribute('chart')])
-				.then(module => {
+				.then((module) => {
 					resolve(new module.default(this.svgElement));
 				});
 		});
 	}
 
+	get series() {
+		return this.seriesProperty;
+	}
+
 	set series(series) {
-		this.chartReady.then(chart => chart.renderData(series));
+		this.seriesProperty = series;
+		this.chartReady.then((chart) => chart.renderData(this.seriesProperty));
+	}
+
+	get config() {
+		return this.configProperty;
 	}
 
 	set config(config) {
-		this.chartReady.then(chart => {
-			chart.setupTooltip(this.tooltipElement, config);
-			chart.addLinearGradients(config.linearGradients);
-			chart.setPadding(config.padding);
+		this.configProperty = config;
+		this.chartReady.then((chart) => {
+			chart.setupTooltip(this.tooltipElement, this.configProperty);
+			chart.addLinearGradients(this.configProperty.linearGradients);
+			chart.setPadding(this.configProperty.padding);
 		});
 	}
 }

@@ -1,4 +1,4 @@
-import { CssStatic, HtmlStatic } from '../../fiu/js/utils.js';
+import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
 import BazaComponent from '../baza-component.js';
 
 const html = new HtmlStatic(`<form fiu-ref="form">
@@ -20,7 +20,10 @@ form fieldset .errors li {font-size:14px;line-height:20px;}
 form fieldset slot {padding:15px;}
 form fieldset .control {display:none;padding:15px;border-top:1px solid rgba(245, 245, 245, 1.0);}
 form fieldset .control.show {display:block;}
-form fieldset .control .button {text-decoration:none;display:inline-block;margin:0 15px 0 0;transition:.3s all ease;color:rgba(255, 255, 255, 1);font-size:14px;line-height:20px;font-weight:bold;padding:6px 12px;border:none;cursor:pointer;border-radius:2px;}
+form fieldset .control .button {
+	text-decoration:none;display:inline-block;margin:0 15px 0 0;transition:.3s all ease;color:rgba(255, 255, 255, 1);font-size:14px;
+	line-height:20px;font-weight:bold;padding:6px 12px;border:none;cursor:pointer;border-radius:2px;
+}
 form fieldset ::slotted(.hidden-fields) {display:none;}
 .form-help {font-size:14px;margin:5px 0 10px 0;}
 .bg-red-50 {background-color:rgba(244,67,54,1.0);}
@@ -37,31 +40,21 @@ export default class BazaFormComponent extends BazaComponent {
 		css,
 	];
 	static registerComponents = [];
-
 	form;
 	control;
 	button;
 	errors;
-
 	headers = {};
 	requestOptions = {};
-	successHandler = response => response;
-	parser = response => response.json();
-
 	fieldTranslations;
-
-	constructor() {
-		super();
-	}
-
-	unload() {
-	}
+	successHandler = (response) => response;
+	parser = (response) => response.json();
 
 	onTemplateLoaded() {
 		const submitValue = this.attribute('submit-value'),
 			skipAuthentication = this.attribute('skip-authentication');
 
-		if (!!submitValue) {
+		if (submitValue) {
 			this.control.classList.add('show');
 			this.button.setAttribute('value', submitValue);
 		}
@@ -69,8 +62,9 @@ export default class BazaFormComponent extends BazaComponent {
 		this.form.addEventListener('submit', (event) => {
 			event.preventDefault();
 
-			const formData = new FormData();
-			Object.entries(this.compileValues()).forEach(entry => {
+			const formData = new FormData;
+
+			Object.entries(this.compileValues()).forEach((entry) => {
 				formData.append(...entry);
 			});
 
@@ -89,7 +83,8 @@ export default class BazaFormComponent extends BazaComponent {
 	validate() {
 		const fields = this.querySelectorAll('baza-field');
 		let valid = true;
-		fields.forEach(field => {
+
+		fields.forEach((field) => {
 			valid = valid && field.validate();
 		});
 
@@ -100,7 +95,7 @@ export default class BazaFormComponent extends BazaComponent {
 		const result = {},
 			fields = this.querySelectorAll('baza-field');
 
-		fields.forEach((field, index) => {
+		fields.forEach((field) => {
 			Object.assign(result, field.compileValues(this.fieldTranslations));
 		});
 
@@ -128,13 +123,13 @@ export default class BazaFormComponent extends BazaComponent {
 	}
 
 	setErrors(errors) {
-		const formErrors = errors.__all__;
+		const formErrors = errors['__all__'];
 
 		this.removeErrors(); // First we'll just clean any previous errors
 
-		if (!!formErrors) {
+		if (formErrors) {
 			this.errors.classList.add('show');
-			formErrors.forEach((error, index) => {
+			formErrors.forEach((error) => {
 				const item = this.newElement('li');
 
 				item.textContent = error.message;
@@ -142,10 +137,11 @@ export default class BazaFormComponent extends BazaComponent {
 			});
 		}
 
-		Object.entries(errors).forEach((entry, index) => {
+		Object.entries(errors).forEach((entry) => {
 			const selector = this.fieldTranslations && this.fieldTranslations[entry[0]] || entry[0],
-				field = this.querySelector(`#${selector}`);
-			if (!!field) {
+				field = this.querySelector(`#${ selector }`);
+
+			if (field) {
 				field.setErrors(entry[1]);
 			}
 		});
@@ -154,16 +150,17 @@ export default class BazaFormComponent extends BazaComponent {
 	removeErrors() {
 		this.errors.innerHTML = '';
 		this.errors.classList.remove('show');
-		this.querySelectorAll('baza-field').forEach(field => {
+		this.querySelectorAll('baza-field').forEach((field) => {
 			field.removeErrors();
 		});
 	}
 
 	populateForm(blob) {
-		Object.entries(blob).forEach((entry, index) => {
+		Object.entries(blob).forEach((entry) => {
 			const selector = this.fieldTranslations && this.fieldTranslations[entry[0]] || entry[0],
-				field = this.querySelector(`#${selector}`);
-			if (!!field) {
+				field = this.querySelector(`#${ selector }`);
+
+			if (field) {
 				field.setValue(entry[1]);
 			}
 		});

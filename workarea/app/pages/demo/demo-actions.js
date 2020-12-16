@@ -1,5 +1,6 @@
 export class DemoTestXAction {
 	slice = 'clicks/x'
+
 	ev;
 
 	constructor(ev) {
@@ -13,6 +14,7 @@ export class DemoTestXAction {
 
 export class DemoTestYAction {
 	slice = 'clicks/y'
+
 	ev;
 
 	constructor(ev) {

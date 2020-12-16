@@ -1,4 +1,4 @@
-import { CssStatic, HtmlStatic } from '../../fiu/js/utils.js';
+import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
 import BazaComponent from '../baza-component.js';
 
 const html = new HtmlStatic(`<slot></slot>`),
@@ -15,17 +15,7 @@ export default class BazaRowComponent extends BazaComponent {
 	];
 	static registerComponents = [];
 
-	constructor() {
-		super();
-	}
-
-	unload() {
-	}
-
 	onTemplateLoaded() {
-	}
-
-	populateFields() {
-		return {};
+		this.eslintPlaceholder = 0;
 	}
 }

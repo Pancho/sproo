@@ -1,4 +1,5 @@
 export default class Chart {
+	static textMeasurementsCache = {};
 	svg = null;
 	width = 0;
 	height = 0;
@@ -12,11 +13,9 @@ export default class Chart {
 		left: 30,
 	};
 
-	static textMeasurementsCache = {};
-
 	constructor(svg) {
 		this.svg = svg;
-		this.ready = new Promise(resolve => {
+		this.ready = new Promise((resolve) => {
 			setTimeout(() => { // We have to delay picking up the actual width and height, lest we want haggard charts
 				this.width = this.svg.width.baseVal.value;
 				this.height = this.svg.height.baseVal.value;
@@ -26,43 +25,41 @@ export default class Chart {
 		});
 	}
 
-	getSeriesMinimums(data) {
+	static getSeriesMinimums() {
 		throw new Error('Chart implementation must implement getSeriesMinimums function');
 	}
 
-	getSeriesMaximums(data) {
+	static getSeriesMaximums() {
 		throw new Error('Chart implementation must implement getSeriesMaximums function');
 	}
 
-	getMagnitude(yMin, yMax) {
+	static getMagnitude() {
 		throw new Error('Chart implementation must implement getMagnitude function');
 	}
 
 	analyzeData(data) {
-		const yMinimums = this.getSeriesMinimums(data),
-			yMaximums = this.getSeriesMaximums(data);
-		let yAxisLabels = [];
-
-		const yMin = Math.min(...yMinimums),
+		const yMinimums = this.constructor.getSeriesMinimums(data),
+			yMaximums = this.constructor.getSeriesMaximums(data),
+			yMin = Math.min(...yMinimums),
 			yMax = Math.max(...yMaximums),
-			{atMagnitude, factor} = this.getMagnitude(yMin, yMax);
-		let yMaxChart = atMagnitude,
-			step = factor !== 0 ? Math.abs(atMagnitude) / factor : 1,
+			{atMagnitude, factor} = this.constructor.getMagnitude(yMin, yMax);
+		let yAxisLabels = [],
+			yMaxChart = atMagnitude,
+			step = factor === 0 ? 1 : Math.abs(atMagnitude) / factor,
 			counter = 0,
 			heightCutoff = 0,
 			heightAddition = 0,
 			yOffset = 0;
 
 		while (yMaxChart < yMax) {
-			// yMaxChart = atMagnitude + counter * step;
-			// yAxisLabels.push(yMaxChart);
-			// counter += 1;
 			yMaxChart = atMagnitude + counter * step;
-			if (yMaxChart === 0 || yMaxChart > (yMin - step)) {
+
+			if (yMaxChart === 0 || yMaxChart > yMin - step) {
 				yAxisLabels.push(yMaxChart);
 			}
-			// yAxisLabels.push(yMaxChart);
+
 			counter += 1;
+
 			if (yAxisLabels.length > 8) {
 				yAxisLabels = [];
 				yMaxChart = atMagnitude;
@@ -75,13 +72,18 @@ export default class Chart {
 			const diff = yMaxChart - atMagnitude,
 				zeroRatio = atMagnitude / diff,
 				paintHeight = this.getPaintHeight();
+
 			yOffset = zeroRatio * paintHeight;
-			if (Math.abs(yOffset) > Math.abs(this.getPaintHeight())) { // This is here to normalize what "0" is when the whole chart if offset
+
+			// This is here to normalize what "0" is when the whole chart if offset
+			if (Math.abs(yOffset) > Math.abs(this.getPaintHeight())) {
 				yOffset = Math.sign(yOffset) * this.getPaintHeight();
 			}
+
 			if (yMin > 0) {
 				heightCutoff = Math.abs(yOffset);
 			}
+
 			if (yMax < 0) {
 				heightAddition = Math.abs(paintHeight * yMaxChart / diff);
 			}
@@ -104,19 +106,20 @@ export default class Chart {
 			analysis.yAxisLabels.forEach((label, index) => {
 				const step = index * (this.getPaintHeight() / (analysis.yAxisLabels.length - 1)),
 					labelDisplay = this.humanize(label),
-					textElement = this.newText(
+					textElement = Chart.newText(
 						labelDisplay,
 						this.padding.left - this.predictTextWidth(labelDisplay, 'y-axis-text axis-text') - 3,
 						this.height - step - this.padding.bottom + 3,
 						{'class': 'y-axis-text axis-text'},
 					),
-					lineElement = this.newLine(
+					lineElement = Chart.newLine(
 						this.padding.left,
 						this.height - step - this.padding.bottom,
 						this.width - this.padding.right,
 						this.height - step - this.padding.bottom,
 						{'class': 'x-axis'},
 					);
+
 				this.appendToGroup('y-axis', textElement);
 				this.appendToGroup('y-axis', lineElement);
 			});
@@ -127,22 +130,24 @@ export default class Chart {
 
 	renderData(data) {
 		this.ready.then(() => {
-			this._renderData(data);
+			this.internalRenderData(data);
 		});
 	}
 
-	_renderData(data) {
-		throw new Error('Base Chart class does not implement renderData.');
+	internalRenderData(data) {
+		throw new Error(`Base Chart class does not implement renderData [${ this }]{${ data }`);
 	}
 
-	newElement(tagName, attributes) {
+	static newElement(tagName, attributes) {
 		const newElement = document.createElementNS('http://www.w3.org/2000/svg', tagName);
+
 		Object.entries(attributes).forEach((entry) => newElement.setAttribute(...entry));
+
 		return newElement;
 	}
 
-	newLine(x1, y1, x2, y2, attributes) {
-		return this.newElement('line', {
+	static newLine(x1, y1, x2, y2, attributes) {
+		return Chart.newElement('line', {
 			x1: x1,
 			y1: y1,
 			x2: x2,
@@ -151,36 +156,37 @@ export default class Chart {
 		});
 	}
 
-	newText(text, x, y, attributes) {
-		const textElement = this.newElement('text', {
+	static newText(text, x, y, attributes) {
+		const textElement = Chart.newElement('text', {
 			x: x,
 			y: y,
 			...attributes,
 		});
+
 		textElement.textContent = text;
+
 		return textElement;
 	}
 
-	newRectangle(x, y, width, height, attributes) {
-		const rectangleElement = this.newElement('rect', {
+	static newRectangle(x, y, width, height, attributes) {
+		return Chart.newElement('rect', {
 			x: x,
 			y: y,
 			width: width,
 			height: height,
 			...attributes,
 		});
-		return rectangleElement;
 	}
 
-	newLinearGradient(id, attributes) {
-		return this.newElement('linearGradient', {
+	static newLinearGradient(id, attributes) {
+		return Chart.newElement('linearGradient', {
 			id: id,
 			...attributes,
 		});
 	}
 
-	newCircle(x, y, radius, attributes) {
-		return this.newElement('circle', {
+	static newCircle(x, y, radius, attributes) {
+		return Chart.newElement('circle', {
 			cx: x,
 			cy: y,
 			r: radius,
@@ -188,29 +194,29 @@ export default class Chart {
 		});
 	}
 
-	newPolyline(points, attributes) {
-		return this.newElement('polyline', {
+	static newPolyline(points, attributes) {
+		return Chart.newElement('polyline', {
 			points: points,
 			...attributes,
 		});
 	}
 
-	newPolygon(points, attributes) {
-		return this.newElement('polygon', {
+	static newPolygon(points, attributes) {
+		return Chart.newElement('polygon', {
 			points: points,
 			...attributes,
 		});
 	}
 
-	newStop(offset, attributes) {
-		return this.newElement('stop', {
+	static newStop(offset, attributes) {
+		return Chart.newElement('stop', {
 			offset: offset,
 			...attributes,
 		});
 	}
 
-	newGroup(groupName, attributes) {
-		return this.newElement('g', {
+	static newGroup(groupName, attributes) {
+		return Chart.newElement('g', {
 			'id': groupName,
 			...attributes,
 		});
@@ -218,18 +224,21 @@ export default class Chart {
 
 	appendToGroup(groupName, element, attributes) {
 		if (!this.groupRegistry[groupName]) {
-			this.groupRegistry[groupName] = this.newGroup(groupName, attributes);
+			this.groupRegistry[groupName] = Chart.newGroup(groupName, attributes);
 			this.svg.append(this.groupRegistry[groupName]);
 		}
-		if (!!element) {
+
+		if (element) {
 			this.groupRegistry[groupName].append(element);
 		}
+
 		return this.groupRegistry[groupName];
 	}
 
 	emptyGroup(groupName) {
 		const group = this.groupRegistry[groupName];
-		if (!!group) {
+
+		if (group) {
 			while (group.lastElementChild) {
 				group.removeChild(group.lastElementChild);
 			}
@@ -238,29 +247,32 @@ export default class Chart {
 
 	addLinearGradients(gradients) {
 		gradients.forEach((gradient, index) => {
-			const attributes = !!gradient.vertical ? {
+			const attributes = gradient.vertical ? {
 					x1: 0,
 					y1: 0,
 					x2: 0,
 					y2: 1,
 				} : {},
-				gradientElement = this.newLinearGradient(`series-${index}`, attributes);
-			let i = 0, j = gradient.stops - 1 || 1;
+				gradientElement = Chart.newLinearGradient(`series-${ index }`, attributes),
+				j = gradient.stops - 1 || 1;
+			let i = 0;
+
 			for (; i < j; i += 1) {
-				gradientElement.append(this.newStop(`${((100 * i / j).toFixed(2))}%`, {'class': `series-${index}-stop-${i}`}));
+				gradientElement.append(Chart.newStop(`${ (100 * i / j).toFixed(2) }%`, {'class': `series-${ index }-stop-${ i }`}));
 			}
-			gradientElement.append(this.newStop('100.00%', {'class': `series-${index}-stop-${i}`}));
+
+			gradientElement.append(Chart.newStop('100.00%', {'class': `series-${ index }-stop-${ i }`}));
 			this.appendToGroup('gradients', gradientElement);
 		});
 	}
 
 	setPadding(padding) {
 		if (
-			!!padding &&
-			!!padding.top &&
-			!!padding.right &&
-			!!padding.bottom &&
-			!!padding.left
+			Boolean(padding) &&
+			Boolean(padding.top) &&
+			Boolean(padding.right) &&
+			Boolean(padding.bottom) &&
+			Boolean(padding.left)
 		) {
 			this.padding = padding;
 		}
@@ -269,11 +281,11 @@ export default class Chart {
 	humanize(value) {
 		const prefix = value < 0 ? '-' : '',
 			absValue = Math.abs(value),
-			mag = this.magnitude(absValue);
-		let result = value.toString(),
-			modulo = mag % 3, // Every 1000
-			displayedValue = value / 10 ** (mag - modulo),
-			decimals = `.${displayedValue.toFixed(1).split('.')[1]}`;
+			mag = this.constructor.magnitude(absValue),
+			modulo = mag % 3,
+			displayedValue = value / 10 ** (mag - modulo);
+		let result = value.toString(), // Every 1000
+			decimals = `.${ displayedValue.toFixed(1).split('.')[1] }`;
 
 		if (decimals === '.0') {
 			decimals = '';
@@ -282,43 +294,47 @@ export default class Chart {
 		if (mag <= 3) {
 			result = absValue;
 		} else if (mag > 3 && mag <= 6) {
-			result = `${absValue.toString().substr(0, mag - 3)}${decimals}K`;
+			result = `${ absValue.toString().substr(0, mag - 3) }${ decimals }K`;
 		} else if (mag > 6 && mag <= 9) {
-			result = `${absValue.toString().substr(0, mag - 6)}${decimals}K`;
+			result = `${ absValue.toString().substr(0, mag - 6) }${ decimals }K`;
 		} else if (mag > 9 && mag <= 12) {
-			result = `${absValue.toString().substr(0, mag - 9)}${decimals}K`;
+			result = `${ absValue.toString().substr(0, mag - 9) }${ decimals }K`;
 		} else if (mag > 12 && mag <= 15) {
-			result = `${absValue.toString().substr(0, mag - 12)}${decimals}K`;
+			result = `${ absValue.toString().substr(0, mag - 12) }${ decimals }K`;
 		} else if (mag > 15 && mag <= 18) {
-			result = `${absValue.toString().substr(0, mag - 15)}${decimals}K`;
+			result = `${ absValue.toString().substr(0, mag - 15) }${ decimals }K`;
 		} else if (mag > 18 && mag <= 21) {
-			result = `${absValue.toString().substr(0, mag - 18)}${decimals}K`;
+			result = `${ absValue.toString().substr(0, mag - 18) }${ decimals }K`;
 		} else if (mag > 21 && mag <= 24) {
-			result = `${absValue.toString().substr(0, mag - 21)}${decimals}K`;
+			result = `${ absValue.toString().substr(0, mag - 21) }${ decimals }K`;
 		} else if (mag > 24 && mag <= 27) {
-			result = `${absValue.toString().substr(0, mag - 24)}${decimals}S`;
+			result = `${ absValue.toString().substr(0, mag - 24) }${ decimals }S`;
 		}
+
 		// Too large... enjoy
-		return `${prefix}${result}`;
+		return `${ prefix }${ result }`;
 	}
 
-	magnitude(value) {
-		let mag = 0;
-		while (value >= 1) {
+	static magnitude(value) {
+		let mag = 0,
+			workingValue = value;
+
+		while (workingValue >= 1) {
 			mag += 1;
-			value = value / 10;
+			workingValue /= 10;
 		}
+
 		return mag;
 	}
 
-	roundToMagnitude(value) {
+	static roundToMagnitude(value) {
 		const absValue = Math.abs(value),
-			magnitude = Math.max(2, this.magnitude(absValue) - 1),
+			magnitude = Math.max(2, Chart.magnitude(absValue) - 1),
 			rounding = value < 0 ? Math.ceil : Math.floor;
 
 		return {
-			atMagnitude: Math.sign(value) * rounding(absValue / (10 ** magnitude)) * (10 ** magnitude),
-			factor: rounding(absValue / (10 ** magnitude)),
+			atMagnitude: Math.sign(value) * rounding(absValue / 10 ** magnitude) * 10 ** magnitude,
+			factor: rounding(absValue / 10 ** magnitude),
 		};
 	}
 
@@ -326,7 +342,7 @@ export default class Chart {
 		let element = this.svg.querySelector('.measure');
 
 		if (!element) {
-			element = this.newText('', 0, 0, {'class': `measure ${measurement}`});
+			element = Chart.newText('', 0, 0, {'class': `measure ${ measurement }`});
 			this.appendToGroup('measure', element);
 		}
 
@@ -337,12 +353,14 @@ export default class Chart {
 		if (typeof text === 'string' && text.trim() === '') {
 			return 0;
 		}
-		return `${text}`.split('').map(letter => {
-			const cacheKey = `${letter}${measurement}`;
+
+		return `${ text }`.split('').map((letter) => {
+			const cacheKey = `${ letter }${ measurement }`;
 			let width = Chart.textMeasurementsCache[cacheKey];
 
 			if (!width) {
 				const measurementElement = this.getMeasurementText(measurement);
+
 				measurementElement.textContent = letter;
 				width = measurementElement.getComputedTextLength();
 				Chart.textMeasurementsCache[cacheKey] = width;
@@ -361,8 +379,8 @@ export default class Chart {
 	}
 
 	setupTooltip(tooltip, config) {
-		this.tooltip = tooltip;
 		if (typeof config.tooltip === 'function') {
+			this.tooltip = tooltip;
 			this.tooltipCallback = config.tooltip;
 		}
 	}

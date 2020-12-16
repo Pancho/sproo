@@ -1,22 +1,10 @@
 import App from '../fiu/js/app.js';
 
-class Demo extends App {
-	constructor(config) {
-		super(
-			config,
-		);
-	}
-}
-
-new Demo({
+new App({
 	routeRoot: 'http://localhost',
 	staticRoot: '',
-	homePage: {
-		component: '/app/pages/demo/demo.js',
-	},
-	notFound: {
-		component: '/app/pages/not-found/not-found.js',
-	},
+	homePage: {component: '/app/pages/demo/demo.js'},
+	notFound: {component: '/app/pages/not-found/not-found.js'},
 	routes: [
 		{
 			path: '/baza-test-range',
@@ -42,7 +30,5 @@ new Demo({
 	authenticationModule: null,
 	httpEndpointStub: 'http://localhost',
 	onAppReady: [],
-	loggerConfig: {
-		level: 'trace',
-	},
+	loggerConfig: {level: 'trace'},
 });
