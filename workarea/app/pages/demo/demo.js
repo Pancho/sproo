@@ -9,9 +9,7 @@ export default class DemoPageComponent extends Component {
 		'/fiu/css/normalize',
 		'/app/pages/demo/demo',
 	];
-
 	static registerComponents = ['/app/components/child-component/child-component.js'];
-
 	valuesUpdated = false;
 
 	logEvent(ev) {
