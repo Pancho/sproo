@@ -1,5 +1,6 @@
 import App from '../fiu/js/app.js';
 
+
 new App({
 	routeRoot: 'http://localhost',
 	staticRoot: '',
@@ -9,6 +10,14 @@ new App({
 		{
 			path: '/baza-test-range',
 			component: '/app/pages/baza/baza.js',
+		},
+		{
+			path: '/baza-test-range/charts',
+			component: '/app/pages/baza-charts/baza-charts.js',
+		},
+		{
+			path: '/baza-test-range/form',
+			component: '/app/pages/baza-form/baza-form.js',
 		},
 		{
 			path: '/empty',

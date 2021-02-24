@@ -18,6 +18,7 @@ export default class BazaCardComponent extends BazaComponent {
 	];
 	static registerComponents = [];
 	titleElement;
+	loading = false;
 
 	onTemplateLoaded() {
 		const elementTitle = this.getAttribute('title');

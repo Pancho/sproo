@@ -19,9 +19,9 @@ export default class Chart {
 			setTimeout(() => { // We have to delay picking up the actual width and height, lest we want haggard charts
 				this.width = this.svg.width.baseVal.value;
 				this.height = this.svg.height.baseVal.value;
+				console.log(this.width, this.height);
 				resolve();
 			}, 0);
-			// }, 50);
 		});
 	}
 

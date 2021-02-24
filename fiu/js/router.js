@@ -84,7 +84,7 @@ export default class Router {
 		this.routeRoot = routeRoot;
 		this.authenticationUrl = authenticationUrl;
 
-		window.addEventListener('popstate', this.resolve);
+		window.addEventListener('popstate', (state) => this.resolve(state.target.location.href));
 
 		this.homePageRoute = {
 			handler: async () => {
@@ -131,7 +131,7 @@ export default class Router {
 		this.routes = [];
 		this.destroyed = true;
 
-		window.removeEventListener('popstate', this.resolve);
+		window.removeEventListener('popstate', (state) => this.resolve(state.target.location.href));
 	}
 
 	add(route, handler = null) {

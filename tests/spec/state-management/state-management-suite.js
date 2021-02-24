@@ -1,4 +1,4 @@
-import { Suite } from '../../api/suite.js';
+import {Suite} from '../../api/suite.js';
 import * as stateManagement from './state-management.js';
 
 export class StateManagementSuite extends Suite {

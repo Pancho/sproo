@@ -88,7 +88,7 @@ export default class BazaChartComponent extends BazaComponent {
 	// * Bar chart
 	// * Candlesticks
 	// * Line chart & area chart
-	// * Pie & doughnut chart
+	// * Pie & donut chart
 	// * Gauge
 	// * Timeline ?
 

@@ -145,7 +145,7 @@ import {Utils} from './utils.js';
 *     constructor(params) { // For params, see sablono/fiu/router.js
 *         super();
 *         // Your code here
-*     } // You may omit the constructor alltogether
+*     } // You may omit the constructor altogether
 * }
 */
 
@@ -227,6 +227,10 @@ export default class Component extends HTMLElement {
 	updatePageLinks(doc) {
 		doc.addEventListener('click', (event) => {
 			let target = event.target;
+
+			if (target instanceof Component || !doc.contains(target)) {
+				return false;
+			}
 
 			for (; Boolean(target) && Boolean(target.parentElement); target = target.parentNode) {
 				if (target.matches('[route]')) {
