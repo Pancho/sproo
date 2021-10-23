@@ -1,41 +1,16 @@
-import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
+import utils from '../../fiu/js/utils/index.js';
 import BazaComponent from '../baza-component.js';
 
-const html = new HtmlStatic(`<table>
-	<thead fiu-ref="thead">
-		<tr></tr>
-	</thead>
-	<tbody fiu-ref="tbody"></tbody>
-	<tfoot fiu-ref="tfoot">
-		<tr></tr>
-	</tfoot>
+const html = new utils.HtmlStatic(`<table>
+	<thead fiu-ref="thead"></thead>
+	<tbody fiu-ref="tbody">
+		<tr for-each="row in internalData">
+			<td for-each="item in row"><span [text-content]="item"></span></td>
+		</tr>
+	</tbody>
+	<tfoot fiu-ref="tfoot"></tfoot>
 </table>`),
-	css = new CssStatic(`:host {display:flex;}
-table {width:100%;border-collapse:separate;}
-table tr {}
-table tr td {padding:8px;font-size:14px;line-height:20px;vertical-align:top;}
-table tr th {padding:8px;font-size:14px;line-height:20px;vertical-align:top;font-weight:700;}
-table tr .narrow {width:20%;}
-table tr .free {width:auto;}
-table tr .wide {width:50%;}
-table thead {display:none;}
-table thead.show {display:table-header-group;}
-table thead tr {}
-table thead tr th {border-bottom:1px solid rgba(245, 245, 245, 1.0);cursor:pointer;}
-table tbody tr {cursor:pointer;}
-table tbody tr td {border-bottom:1px solid rgba(245, 245, 245, 1.0);}
-table tbody tr td a {text-decoration:none;}
-table tbody tr td img {max-width:30px;max-height:30px;}
-table tbody tr:hover {background-color:rgba(245, 245, 245, 1.0);}
-table tbody tr:last-child td {border-bottom:none;}
-table tbody tr.hidden {display:none;}
-table tfoot {display:none;}
-table tfoot.show {display:table-footer-group;}
-.button {
-	text-decoration:none;display:inline-block;margin:0 15px 0 0;transition:.3s all ease;color:rgba(255, 255, 255, 1);font-size:14px;
-	line-height:20px;font-weight:bold;padding:6px 12px;border:none;cursor:pointer;border-radius:2px;
-}
-.button-small {padding:4px 8px;}`);
+	css = new utils.CssStatic(`:host {display:flex;}`);
 
 export default class BazaTableComponent extends BazaComponent {
 	static tagName = 'baza-table';
@@ -45,45 +20,64 @@ export default class BazaTableComponent extends BazaComponent {
 		'/fiu/css/normalize',
 		css,
 	];
-	static registerComponents = [];
+	internalHeaders = [];
+	internalData = [];
+	sortingIndex = {}
+
 	thead;
 	tbody;
 	tfoot;
 
 	onTemplateLoaded() {
-		const header = this.attribute('header');
-
-		if (header) {
-			this.thead.classList.add('show');
-			header.split(',').forEach((headerText) => {
-				const heading = this.newElement('th');
-
-				heading.textContent = headerText.trim();
-				this.thead.querySelector('tr').append(heading);
-			});
-		}
 	}
 
-	updateBody(data) {
-		this.tbody.innerHTML = '';
-		data.forEach((dataRow) => {
-			const row = this.newElement('tr');
+	set headers(headers) {
+		if (!Array.isArray(headers)) {
+			throw new Error(`Headers must be an array. Got ${ typeof headers }`);
+		}
 
-			dataRow.forEach((dataCell) => {
-				const cell = this.newElement('td');
+		this.internalHeaders = headers;
+		const tableRow = this.newElement('tr');
 
-				if (Array.isArray(dataCell)) {
-					dataCell.forEach((part) => {
-						cell.append(part);
-					});
-				} else {
-					cell.append(dataCell);
-				}
+		this.internalHeaders.forEach((header) => {
+			const tableHeader = this.newElement('th');
 
-				row.append(cell);
-			});
-
-			this.tbody.append(row);
+			tableHeader.textContent = header.name;
+			tableRow.appendChild(tableHeader);
 		});
+		this.thead.appendChild(tableRow);
+	}
+
+	get headers() {
+		return this.internalHeaders;
+	}
+
+	set data(data) {
+		if (!Array.isArray(data)) {
+			throw new Error(`Data must be an array. Got ${ typeof data }`);
+		}
+
+		this.internalData = data;
+		// this.internalData.forEach((dataRow) => {
+		// 	const row = this.newElement('tr');
+		//
+		// 	dataRow.forEach((dataCell, index) => {
+		// 		const cell = this.newElement('td');
+		//
+		// 		if (this.internalHeaders[index].transform) {
+		// 			cell.textContent = this.internalHeaders[index].transform(dataCell);
+		// 		} else {
+		// 			cell.textContent = dataCell;
+		// 		}
+		//
+		// 		row.append(cell);
+		// 	});
+		//
+		// 	this.tbody.append(row);
+		// });
+	}
+
+	get data() {
+		return this.internalData;
 	}
 }

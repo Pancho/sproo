@@ -1,4 +1,4 @@
-import Mavor from '../../fiu/js/mavor.js';
+import utils from '../../fiu/js/utils/index.js';
 
 export class Suite {
 	[Symbol.toStringTag] = 'Suite';
@@ -18,10 +18,10 @@ export class Suite {
 	}
 
 	registerTest(test) {
-		if (Mavor.slugify(test.name) in this.tests) {
+		if (utils.slugify(test.name) in this.tests) {
 			throw new Error(`Cannot register two suites with the same name (${ test.name })`);
 		}
 
-		this.tests[Mavor.slugify(test.name)] = test;
+		this.tests[utils.slugify(test.name)] = test;
 	}
 }

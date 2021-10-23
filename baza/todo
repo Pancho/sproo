@@ -1,36 +1,67 @@
-form element attributes:
-* autocomplete(on|off)
-* enctype (application/x-www-form-urlencoded: The default value; multipart/form-data: Use this if the form contains <input> elements with type=file; text/plain: Introduced by HTML5 for debugging purposes.)
+Components:
+* notification bar
+    * background color
+    * timeouts
+    * close actions
+* avatar?
+    * image
+* dialog
+    * fullscreen
+    * lightbox
+    * top/right/bottom/left
+* button?
+* carousel
+* chip (a small div with some text or icons or whatever)
+* lists
+    * expanding
+* forms
+    * field error messages
+    * form error messages
+    * text
+    * hidden
+    * checkboxes
+    * radios
+    * file input
+    * select
+        * multiple
+    * textarea
+    * date
+    * datetime
+    * tel
+    * email
+    * url
+    * number
+    * password
+    * reset
+    * submit
+* pagination?
+* datepicker
+* progress bar
+* tables
+     * search
+     * sort
+* tabs
+* tooltips
 
 
-other elements:
-* input with datalist (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/datalist)
-* select
-* textarea
+Charts:
+Bugs
 
-input types
-checkbox
-date
-datetime-local
-email
-file
-hidden
-number
-password
-radio
-range?
-reset
-search
-submit
-tel
-url
+* Need to implement the tooltip in a reasonable lazy-loading way, so it doesn't need to be a part of the config; some
+nice default + way to customize the hell out of it.
 
-attributes:
-* autofocus
-* disabled
-* min
-* max
-* minlength
-* placeholder
-* required
-*
+Attributes
+Height & width
+Config setter & rerender
+Data setter & rerender
+
+Missing charts:
+* Geo chart (where to get the map(s)?)
+* Scatter chart
+* Histogram
+* Bar chart
+* Candlesticks
+* Line chart & area chart
+* Pie & donut chart
+* Gauge
+* Timeline ?

@@ -1,9 +1,7 @@
-import utils from '../../fiu/js/utils/index.js';
-import BazaComponent from '../baza-component.js';
+import utils from '../../../fiu/js/utils/index.js';
+import BazaComponent from '../../baza-component.js';
 
-const html = new utils.HtmlStatic(`<label fiu-ref="label"></label>
-<slot></slot>
-<ol fiu-ref="errors"></ol>`),
+const html = new utils.HtmlStatic(`<input type="email">`),
 	css = new utils.CssStatic(`:host {display:flex;flex-direction:column;}`);
 
 /*

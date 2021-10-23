@@ -1,7 +1,6 @@
 import App from '../../fiu/js/app.js';
 import Authentication from '../../fiu/js/authentication.js';
 import Http from '../../fiu/js/http.js';
-import Mavor from '../../fiu/js/mavor.js';
 import Router from '../../fiu/js/router.js';
 
 function deepEquals(obj1, obj2) {
@@ -54,6 +53,14 @@ export class Test {
 
 		this.successMessage = successMessage;
 		this.failedMessage = failedMessage;
+	}
+
+	static createElement(string) {
+		const wrapper = document.createElement('div');
+
+		wrapper.innerHTML = string;
+
+		return wrapper.firstElementChild;
 	}
 
 	assertEquals(value, expectedValue) {
@@ -411,7 +418,7 @@ export class AppTest extends Test {
 
 	async setup() {
 		this.url = window.location.href;
-		this.routerOutlet = Mavor.createElement('<router-outlet></router-outlet>');
+		this.routerOutlet = Test.createElement('<router-outlet></router-outlet>');
 		document.querySelector('body main').appendChild(this.routerOutlet);
 		this.app = new App(this.config);
 		await this.app.ready;

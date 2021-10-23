@@ -1,11 +1,11 @@
-import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
+import utils from '../../fiu/js/utils/index.js';
 import BazaComponent from '../baza-component.js';
 
-const html = new HtmlStatic(`<h1 fiu-ref="titleElement" [textContent]="title"></h1>
+const html = new utils.HtmlStatic(`<h1 fiu-ref="titleElement" [textContent]="title"></h1>
 		<svg fiu-ref="svgElement"></svg>
 		<ol fiu-ref="legendElement"></ol>
 		<div fiu-ref="tooltipElement"></div>`),
-	css = new CssStatic(`:host {display:flex;position:relative;}
+	css = new utils.CssStatic(`:host {display:flex;position:relative;}
 			/*Must figure out what CSS would work for generalizing the color palette, for any type of chart*/
 			[fiu-ref="svgElement"] {width:100%;margin:20px 0;}
 			[fiu-ref="svgElement"] {width:100%;margin:20px 0;}
@@ -73,24 +73,6 @@ export default class BazaChartComponent extends BazaComponent {
 
 	seriesProperty;
 	configProperty;
-
-	// Bugs
-
-	// Attributes
-	// Height & width
-	// Config setter & rerender
-	// Data setter & rerender
-
-	// Missing charts:
-	// * Geo chart (where to get the map(s)?)
-	// * Scatter chart
-	// * Histogram
-	// * Bar chart
-	// * Candlesticks
-	// * Line chart & area chart
-	// * Pie & donut chart
-	// * Gauge
-	// * Timeline ?
 
 	onTemplateLoaded() {
 		const elementTitle = this.getAttribute('title');

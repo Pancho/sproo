@@ -1,6 +1,0 @@
-:host {display:flex;width:100%;}
-main {width:100%;align-items:center;justify-content:center;display:flex;flex-direction:column;margin:41px 0 0 0;}
-main h2 {margin:20px 0;text-align:center;font-family:'Roboto', sans-serif;font-size:20px;line-height:40px;}
-main baza-form {box-shadow:0 1px 3px rgba(0, 0, 0, 0.1);border-radius:2px;width:300px;}
-.bg-bluegrey-5 {background-color:rgba(236,239,241,1.0);}
-.bg-white {background-color:rgba(255,255,255,1.0);}

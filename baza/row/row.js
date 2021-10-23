@@ -1,8 +1,8 @@
-import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
+import utils from '../../fiu/js/utils/index.js';
 import BazaComponent from '../baza-component.js';
 
-const html = new HtmlStatic(`<slot></slot>`),
-	css = new CssStatic(`:host {}
+const html = new utils.HtmlStatic(`<slot></slot>`),
+	css = new utils.CssStatic(`:host {}
 slot {display:flex;flex-direction:row;flex:auto;}`);
 
 export default class BazaRowComponent extends BazaComponent {

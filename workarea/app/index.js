@@ -16,8 +16,16 @@ new App({
 			component: '/app/pages/baza-charts/baza-charts.js',
 		},
 		{
-			path: '/baza-test-range/form',
-			component: '/app/pages/baza-form/baza-form.js',
+			path: '/baza-test-range/forms',
+			component: '/app/pages/baza-forms/baza-forms.js',
+		},
+		{
+			path: '/baza-test-range/cards',
+			component: '/app/pages/baza-cards/baza-cards.js',
+		},
+		{
+			path: '/baza-test-range/tables',
+			component: '/app/pages/baza-tables/baza-tables.js',
 		},
 		{
 			path: '/empty',
@@ -28,8 +36,8 @@ new App({
 			component: '/app/pages/empty/empty.js',
 		},
 		{
-			path: '/login',
-			component: '/app/pages/login/login.js',
+			path: '/baza-forms',
+			component: '/app/pages/baza-forms/baza-forms.js',
 		},
 	],
 	rootStylesheets: [

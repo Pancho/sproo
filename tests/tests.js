@@ -1,9 +1,7 @@
-import Mavor from '../fiu/js/mavor.js';
 import {Manager} from './api/manager.js';
 import {DatabaseSuite} from './spec/database/database-suite.js';
 import {FiuAppSuite} from './spec/fiu-app/fiu-app-suite.js';
 import {FiuComponentSuite} from './spec/fiu-component/fiu-component-suite.js';
-import {MavorSuite} from './spec/mavor/mavor-suite.js';
 
 class Tests {
 	manager = (new Manager);
@@ -12,18 +10,29 @@ class Tests {
 	testRunning = false;
 
 	constructor() {
-		this.manager.addSuite(new MavorSuite);
 		this.manager.addSuite(new DatabaseSuite);
 		this.manager.addSuite(new FiuAppSuite);
 		this.manager.addSuite(new FiuComponentSuite);
 		this.initNavigation();
 	}
 
+	static createElement(string) {
+		const wrapper = document.createElement('div');
+
+		wrapper.innerHTML = string;
+
+		return wrapper.firstElementChild;
+	}
+
+	static stripHTMLTags(string) {
+		return string.replace(/<[^>]*>/gu, '');
+	}
+
 	initNavigation() {
 		Object.entries(this.manager.suites).forEach(([slug, suite]) => {
-			this.nav.append(Mavor.createElement(`<a href="#${ slug }">${ suite.name }</a>`));
+			this.nav.append(Tests.createElement(`<a href="#${ slug }">${ suite.name }</a>`));
 		});
-		this.nav.append(Mavor.createElement(`<a href="#all-tests">All Tests</a>`));
+		this.nav.append(Tests.createElement(`<a href="#all-tests">All Tests</a>`));
 
 		this.nav.addEventListener('click', (ev) => {
 			const target = ev.target.getAttribute('href');
@@ -49,10 +58,10 @@ class Tests {
 	getNewContent(...suites) {
 		const allTests = suites.reduce((prev, next) => ({...prev, ...next.tests}), {}),
 			suiteNames = suites.map((suite) => suite.name),
-			content = Mavor.createElement(`<div class="content">
+			content = Tests.createElement(`<div class="content">
 				<h2>${ suiteNames.join(', ') }</h2>
 			</div>`),
-			control = Mavor.createElement(`<div class="control">
+			control = Tests.createElement(`<div class="control">
 				<p class="filter">Tests in suite: ${ Object.keys(allTests).length }</p>
 				<p class="result-count">
 					<span class="filter successful"></span>
@@ -64,14 +73,14 @@ class Tests {
 				</div>
 				<a class="button run-suite">Run All Tests</a>
 			</div>`),
-			testList = Mavor.createElement(`<ol class="test-list"></ol>`);
+			testList = Tests.createElement(`<ol class="test-list"></ol>`);
 
 		content.append(control);
 		content.append(testList);
 		this.main.append(content);
 
 		Object.entries(allTests).forEach(([slug, test]) => {
-			const listItem = Mavor.createElement(`<li class="test" id="${ slug }">
+			const listItem = Tests.createElement(`<li class="test" id="${ slug }">
 					<div>
 						<h3>${ test.name }</h3>
 						<p class="result"></p>
@@ -89,7 +98,7 @@ class Tests {
 
 				selectedTest.run().then(() => {
 					reportPlaceholder.innerHTML = selectedTest.resultReport;
-					reportPlaceholder.setAttribute('title', Mavor.stripHTMLTags(selectedTest.resultReport));
+					reportPlaceholder.setAttribute('title', Tests.stripHTMLTags(selectedTest.resultReport));
 					resultPlaceholder.textContent = selectedTest.resultMessage;
 
 					if (selectedTest.succeeded) {

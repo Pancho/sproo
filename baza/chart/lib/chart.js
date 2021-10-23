@@ -5,7 +5,6 @@ export default class Chart {
 	height = 0;
 	tooltip = null;
 	groupRegistry = {};
-	ready;
 	padding = {
 		top: 30,
 		right: 30,
@@ -15,14 +14,10 @@ export default class Chart {
 
 	constructor(svg) {
 		this.svg = svg;
-		this.ready = new Promise((resolve) => {
-			setTimeout(() => { // We have to delay picking up the actual width and height, lest we want haggard charts
-				this.width = this.svg.width.baseVal.value;
-				this.height = this.svg.height.baseVal.value;
-				console.log(this.width, this.height);
-				resolve();
-			}, 0);
-		});
+		const rect = this.svg.getBoundingClientRect();
+
+		this.width = rect.width;
+		this.height = rect.height;
 	}
 
 	static getSeriesMinimums() {
@@ -129,9 +124,9 @@ export default class Chart {
 	}
 
 	renderData(data) {
-		this.ready.then(() => {
-			this.internalRenderData(data);
-		});
+		// This.ready.then(() => {
+		this.internalRenderData(data);
+		// });
 	}
 
 	internalRenderData(data) {

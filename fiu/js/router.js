@@ -167,7 +167,10 @@ export default class Router {
 	match(path) {
 		return this.routes
 			.map((route) => {
-				const {regexp, paramNames} = RouterUtils.replaceDynamicURLParts(RouterUtils.clean(route.path)),
+				const {
+						regexp,
+						paramNames,
+					} = RouterUtils.replaceDynamicURLParts(RouterUtils.clean(route.path)),
 					match = path.replace(RouterUtils.CLEAN_LEADING_SLASH, '/').match(regexp),
 					params = RouterUtils.regExpResultToParams(match, paramNames);
 
@@ -210,7 +213,6 @@ export default class Router {
 }
 
 class RouterUtils {
-	static DEPTH_TRAILING_SLASH = /\/$/u;
 	static CLEAN_TRAILING_SLASH = /\/+$/u;
 	static CLEAN_LEADING_SLASH = /^\/+/u;
 	static PARAMETER_REGEXP = /([:*])(\w+)/gu;
@@ -271,14 +273,6 @@ class RouterUtils {
 
 				return result;
 			}, null);
-	}
-
-	static getUrlDepth(url) {
-		return url.replace(RouterUtils.DEPTH_TRAILING_SLASH, '').split('/').length;
-	}
-
-	static compareUrlDepth(urlA, urlB) {
-		return RouterUtils.getUrlDepth(urlB) - RouterUtils.getUrlDepth(urlA);
 	}
 
 	static inject(component, ...params) {

@@ -1,14 +1,30 @@
-import {CssStatic, HtmlStatic} from '../../fiu/js/utils.js';
+import utils from '../../fiu/js/utils/index.js';
 import BazaComponent from '../baza-component.js';
 
-const html = new HtmlStatic(`<h1 fiu-ref="titleElement"></h1>
-<div>
+/** @const {utils.HtmlStatic} [HTML static template, so we don't load it from another file] */
+const html = new utils.HtmlStatic(`<header>
+	<h1 fiu-ref="titleElement"></h1>
+</header>
+<main>
 	<slot></slot>
-</div>`),
-	css = new CssStatic(`:host {display:flex;margin:10px;padding:10px;flex:auto;flex-direction:column;}
-	div {width:100%;}`);
+</main>`),
+	/** @const {CssStatic} [CSS static template, so we don't load it from another file] */
+	css = new utils.CssStatic(`:host {display:flex;margin:10px;padding:10px;flex:auto;flex-direction:column;}
+	main {width:100%;}`);
 
-export default class BazaCardComponent extends BazaComponent {
+/**
+ * @class BazaCardComponent
+ *
+ * In your template you can use the card element with the tag <baza-card></baza-card>
+ *
+ * Whatever you put inside it will get slotted in the body of the card. The component has a single slot.
+ *
+ * The tag accepts one attribute: title
+ *
+ * You may also bind the title ([title]="myTitle") and change it dynamically from the parent component. The slotted content
+ * gets changed from the parent component by default.
+ */
+class BazaCardComponent extends BazaComponent {
 	static tagName = 'baza-card';
 	static template = html;
 	static stylesheets = [
@@ -18,24 +34,13 @@ export default class BazaCardComponent extends BazaComponent {
 	];
 	static registerComponents = [];
 	titleElement;
-	loading = false;
 
 	onTemplateLoaded() {
 		const elementTitle = this.getAttribute('title');
 
 		if (elementTitle) {
 			this.titleElement.textContent = this.getAttribute('title');
-		} else {
-			this.titleElement.remove();
 		}
-	}
-
-	get title() {
-		if (this.titleElement) {
-			return this.titleElement.textContent;
-		}
-
-		return '';
 	}
 
 	set title(title) {
@@ -43,4 +48,10 @@ export default class BazaCardComponent extends BazaComponent {
 			this.titleElement.textContent = title;
 		}
 	}
+
+	get title() {
+		return this.titleElement.textContent;
+	}
 }
+
+export default BazaCardComponent;
