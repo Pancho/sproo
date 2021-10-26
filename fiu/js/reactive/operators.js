@@ -1,86 +1,85 @@
-import { EmptyObservable, Observable } from './observable.js';
-import { InnerSubscriber, OuterSubscriber, Subscriber } from './subscriber.js';
+import {EmptyObservable, Observable} from './observable.js';
+import {InnerSubscriber, OuterSubscriber, Subscriber} from './subscriber.js';
 
 function subscribeToResult(outerSubscriber, result, outerValue, outerIndex) {
-	let destination = new InnerSubscriber(outerSubscriber, outerValue, outerIndex);
+	const destination = new InnerSubscriber(outerSubscriber, outerValue, outerIndex);
+
 	if (destination.closed) {
 		return null;
 	}
+
 	if (result instanceof Observable) {
 		destination.syncErrorThrowable = true;
+
 		return result.subscribe(destination);
-	} else if (!!result && Array.isArray(result)) {
+	} else if (Boolean(result) && Array.isArray(result)) {
 		for (let i = 0, len = result.length; i < len && !destination.closed; i += 1) {
 			destination.next(result[i]);
 		}
+
 		if (!destination.closed) {
 			destination.complete();
 		}
 	} else {
 		destination.error(new TypeError('Must provide a stream'));
 	}
+
 	return null;
 }
 
 class SnapshotSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'SnapshotSubscriber';
+
 	constructor(destination, prefix) {
 		super(destination);
 		this.prefix = prefix;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'SnapshotSubscriber';
-	}
-
-	_next(value) {
+	innerNext(value) {
 		if (this.prefix) {
 			console.log(this.prefix, value);
 		} else {
 			console.log(value);
 		}
+
 		this.destination.next(value);
 	}
 }
 
 export function snapshot(prefix) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new SnapshotSubscriber(subscriber, prefix));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new SnapshotSubscriber(subscriber, prefix)));
 }
 
 class PluckSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'PluckSubscriber';
+
 	constructor(destination, path) {
 		super(destination);
 		this.path = path;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'PluckSubscriber';
-	}
+	innerNext(value) {
+		let result = null;
 
-	_next(value) {
-		let result;
 		try {
 			result = this.path.reduce((newValue, slice) => newValue[slice], value);
 		} catch (err) {
 			this.destination.error(err);
+
 			return;
 		}
+
 		this.destination.next(result);
 	}
 }
 
 export function pluck(...path) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new PluckSubscriber(subscriber, path));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new PluckSubscriber(subscriber, path)));
 }
 
 class MapSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'MapSubscriber';
+
 	constructor(destination, projector, thisArg) {
 		super(destination);
 		this.projector = projector;
@@ -88,72 +87,63 @@ class MapSubscriber extends Subscriber {
 		this.thisArg = thisArg || this;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'MapSubscriber';
-	}
+	innerNext(value) {
+		let result = null;
 
-	_next(value) {
-		let result;
 		try {
-			result = this.projector.call(this.thisArg, value, this.count++);
+			result = this.projector.call(this.thisArg, value, this.count += 1);
 		} catch (err) {
 			this.destination.error(err);
+
 			return;
 		}
+
 		this.destination.next(result);
 	}
 }
 
 export function map(projector, thisArg) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new MapSubscriber(subscriber, projector, thisArg));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new MapSubscriber(subscriber, projector, thisArg)));
 }
 
 class MapToSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'MapToSubscriber';
+
 	constructor(destination, value) {
 		super(destination);
 		this.value = value;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'MapToSubscriber';
-	}
 
-	_next(value) {
+	innerNext() {
 		this.destination.next(this.value);
 	}
 }
 
 export function mapTo(value) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new MapToSubscriber(subscriber, value));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new MapToSubscriber(subscriber, value)));
 }
 
 class FilterSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'FilterSubscriber';
+
 	constructor(destination, predicate) {
 		super(destination);
 		this.predicate = predicate;
 		this.count = 0;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'FilterSubscriber';
-	}
+	innerNext(value) {
+		let result = null;
 
-	_next(value) {
-		let result;
 		try {
-			result = this.predicate(value, this.count++);
+			result = this.predicate(value, this.count += 1);
 		} catch (err) {
 			this.destination.error(err);
+
 			return;
 		}
+
 		if (result) {
 			this.destination.next(value);
 		}
@@ -161,28 +151,24 @@ class FilterSubscriber extends Subscriber {
 }
 
 export function filter(predicate) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new FilterSubscriber(subscriber, predicate));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new FilterSubscriber(subscriber, predicate)));
 }
 
 class TapSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'TapSubscriber';
+
 	constructor(destination, nextOrObserver, error, complete) {
 		super(destination);
 		const safeSubscriber = new Subscriber(nextOrObserver, error, complete);
+
 		safeSubscriber.syncErrorThrowable = true;
 		this.add(safeSubscriber);
 		this.safeSubscriber = safeSubscriber;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'TapSubscriber';
-	}
-
-	_next(value) {
+	innerNext(value) {
 		this.safeSubscriber.next(value);
+
 		if (this.safeSubscriber.syncErrorThrown) {
 			this.destination.error(this.safeSubscriber.syncErrorValue);
 		} else {
@@ -190,8 +176,9 @@ class TapSubscriber extends Subscriber {
 		}
 	}
 
-	_error(err) {
+	innerError(err) {
 		this.safeSubscriber.error(err);
+
 		if (this.safeSubscriber.syncErrorThrown) {
 			this.destination.error(this.safeSubscriber.syncErrorValue);
 		} else {
@@ -199,8 +186,9 @@ class TapSubscriber extends Subscriber {
 		}
 	}
 
-	_complete() {
+	innerComplete() {
 		this.safeSubscriber.complete();
+
 		if (this.safeSubscriber.syncErrorThrown) {
 			this.destination.error(this.safeSubscriber.syncErrorValue);
 		} else {
@@ -210,33 +198,30 @@ class TapSubscriber extends Subscriber {
 }
 
 export function tap(nextOrObserver, error, complete) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new TapSubscriber(subscriber, nextOrObserver, error, complete));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new TapSubscriber(subscriber, nextOrObserver, error, complete)));
 }
 
 class CatchErrorOuterSubscriber extends OuterSubscriber {
+	[Symbol.toStringTag] = 'CatchErrorOuterSubscriber';
+
 	constructor(destination, selector, caught) {
 		super(destination);
 		this.selector = selector;
 		this.caught = caught;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'CatchErrorOuterSubscriber';
-	}
-
 	error(err) {
 		if (!this.stopped) {
-			let result;
+			let result = null;
+
 			try {
 				result = this.selector(err, this.caught);
 			} catch (innerError) {
 				super.error(innerError);
+
 				return;
 			}
+
 			this.unsubscribeAndRecycle();
 			this.add(subscribeToResult(this, result));
 		}
@@ -248,25 +233,26 @@ export function catchError(selector) {
 		const caught = source.lift((subscriber) => {
 			source.subscribe(new CatchErrorOuterSubscriber(subscriber, selector, caught));
 		});
+
 		return caught;
 	};
 }
 
 class TakeSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'TakeSubscriber';
+
 	constructor(destination, total) {
 		super(destination);
 		this.total = total;
 		this.count = 0;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'TakeSubscriber';
-	}
-
-	_next(value) {
+	innerNext(value) {
 		this.count += 1;
+
 		if (this.count <= this.total) {
 			this.destination.next(value);
+
 			if (this.count === this.total) {
 				this.destination.complete();
 				this.unsubscribe();
@@ -278,31 +264,31 @@ class TakeSubscriber extends Subscriber {
 export function take(count) {
 	return (source) => {
 		if (count === 0) {
-			return new EmptyObservable();
-		} else {
-			return source.lift((subscriber) => {
-				if (count < 0) {
-					throw new Error('Take "count" parameter must be less or greater than zero (0).');
-				}
-				return source.subscribe(new TakeSubscriber(subscriber, count));
-			});
+			return new EmptyObservable;
 		}
+
+		return source.lift((subscriber) => {
+			if (count < 0) {
+				throw new Error('Take "count" parameter must be less or greater than zero (0).');
+			}
+
+			return source.subscribe(new TakeSubscriber(subscriber, count));
+		});
 	};
 }
 
 class SkipSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'SkipSubscriber';
+
 	constructor(destination, total) {
 		super(destination);
 		this.total = total;
 		this.count = 0;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'SkipSubscriber';
-	}
-
-	_next(value) {
+	innerNext(value) {
 		this.count += 1;
+
 		if (this.count > this.total) {
 			this.destination.next(value);
 		}
@@ -310,42 +296,33 @@ class SkipSubscriber extends Subscriber {
 }
 
 export function skip(count) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new SkipSubscriber(subscriber, count));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new SkipSubscriber(subscriber, count)));
 }
 
 class TakeUntilOuterSubscriber extends OuterSubscriber {
+	[Symbol.toStringTag] = 'TakeUntilOuterSubscriber';
+
 	constructor(destination, notifier) {
 		super(destination);
 		this.notifier = notifier;
 		this.add(subscribeToResult(this, notifier));
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'TakeUntilOuterSubscriber';
-	}
-
-	notifyNext(outerValue, innerValue, outerIndex, innerIndex, innerSub) {
+	notifyNext() {
 		this.complete();
 	}
 
 	notifyComplete() {
-		// noop
+		// Noop
 	}
 }
 
 export function takeUntil(notifier) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new TakeUntilOuterSubscriber(subscriber, notifier));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new TakeUntilOuterSubscriber(subscriber, notifier)));
 }
 
 class SwitchMapOuterSubscriber extends OuterSubscriber {
+	[Symbol.toStringTag] = 'SwitchMapOuterSubscriber';
 	projector;
 	innerSubscription;
 
@@ -354,86 +331,89 @@ class SwitchMapOuterSubscriber extends OuterSubscriber {
 		this.projector = projector;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'SwitchMapOuterSubscriber';
-	}
+	innerNext(value) {
+		let result = null;
 
-	_next(value) {
-		let result;
 		try {
 			result = this.projector(value);
 		} catch (error) {
 			this.destination.error(error);
+
 			return;
 		}
-		this._innerSub(result, value);
+
+		this.innerSubscribe(result, value);
 	}
 
-	_innerSub(result, value) {
+	innerSubscribe(result, value) {
 		const innerSubscription = this.innerSubscription;
+		let innerSubscriber = null,
+			destination = null;
+
 		if (innerSubscription) {
 			innerSubscription.unsubscribe();
 		}
-		const innerSubscriber = new InnerSubscriber(this, value);
-		const destination = this.destination;
+
+		innerSubscriber = new InnerSubscriber(this, value);
+		destination = this.destination;
+
 		destination.add(innerSubscriber);
 		this.innerSubscription = subscribeToResult(this, result);
+
 		if (this.innerSubscription !== innerSubscriber) {
 			destination.add(this.innerSubscription);
 		}
 	}
 
-	_complete() {
+	innerComplete() {
 		if (!this.innerSubscription || this.innerSubscription.closed) {
-			super._complete();
+			super.innerComplete();
 		}
 	}
 
-	_unsubscribe() {
+	internalUnsubscribe() {
 		this.innerSubscription = null;
 	}
 
 	notifyComplete(innerSub) {
 		this.remove(innerSub);
 		this.innerSubscription = null;
+
 		if (this.stopped) {
-			super._complete();
+			super.innerComplete();
 		}
 	}
 
-	notifyNext(outerValue, innerValue, outerIndex, innerIndex, innerSub) {
+	notifyNext(outerValue, innerValue) {
 		this.destination.next(innerValue);
 	}
 }
 
 export function switchMap(projector) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new SwitchMapOuterSubscriber(subscriber, projector));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new SwitchMapOuterSubscriber(subscriber, projector)));
 }
 
 class DistinctUntilChangedSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'DistinctUntilChangedSubscriber';
+
 	constructor(destination, compare, keySelector) {
 		super(destination);
 		this.keySelector = keySelector;
 		this.hasKey = false;
+
 		if (typeof compare === 'function') {
 			this.compare = compare;
 		}
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'DistinctUntilChangedSubscriber';
 	}
 
 	compare(x, y) {
 		return x === y;
 	}
 
-	_next(value) {
-		let key = value;
+	innerNext(value) {
+		let key = value,
+			result = false;
+
 		if (this.keySelector) {
 			try {
 				key = this.keySelector(value);
@@ -442,7 +422,6 @@ class DistinctUntilChangedSubscriber extends Subscriber {
 			}
 		}
 
-		let result = false;
 		if (this.hasKey) {
 			try {
 				result = this.compare(this.key, key);
@@ -461,51 +440,47 @@ class DistinctUntilChangedSubscriber extends Subscriber {
 }
 
 export function distinctUntilChanged(compare, keySelector) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new DistinctUntilChangedSubscriber(subscriber, compare, keySelector));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new DistinctUntilChangedSubscriber(subscriber, compare, keySelector)));
 }
 
 class ScanSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'ScanSubscriber';
+
 	constructor(destination, accumulator, _seed, hasSeed) {
 		super(destination);
 		this.accumulator = accumulator;
-		this._seed = _seed;
+		this.internalSeed = _seed;
 		this.hasSeed = hasSeed;
 		this.index = 0;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'ScanSubscriber';
-	}
-
 	get seed() {
-		return this._seed;
+		return this.internalSeed;
 	}
 
 	set seed(value) {
 		this.hasSeed = true;
-		this._seed = value;
+		this.internalSeed = value;
 	}
 
-	_next(value) {
-		if (!this.hasSeed) {
-			this.seed = value;
-			this.destination.next(value);
-		} else {
-			return this._tryNext(value);
+	innerNext(value) {
+		if (this.hasSeed) {
+			this.internalTryNext(value);
 		}
+
+		this.seed = value;
+		this.destination.next(value);
 	}
 
-	_tryNext(value) {
-		let result;
+	internalTryNext(value) {
+		let result = null;
+
 		try {
 			result = this.accumulator(this.seed, value, this.index);
 		} catch (err) {
 			this.destination.error(err);
 		}
+
 		this.index += 1;
 		this.seed = result;
 		this.destination.next(result);
@@ -513,37 +488,37 @@ class ScanSubscriber extends Subscriber {
 }
 
 export function scan(accumulator, seed) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new ScanSubscriber(subscriber, accumulator, seed, !!seed));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new ScanSubscriber(subscriber, accumulator, seed, Boolean(seed))));
 }
 
 class WithLatestFromSubscriber extends OuterSubscriber {
+	[Symbol.toStringTag] = 'WithLatestFromSubscriber';
+
 	constructor(destination, observables, project) {
 		super(destination);
 		this.project = project;
 		this.toRespond = [];
 		const len = observables.length;
+
 		this.values = new Array(len);
+
 		for (let i = 0; i < len; i += 1) {
 			this.toRespond.push(i);
 		}
+
 		for (let i = 0; i < len; i += 1) {
-			let observable = observables[i];
+			const observable = observables[i];
+
 			this.add(subscribeToResult(this, observable, observable, i));
 		}
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'WithLatestFromSubscriber';
-	}
-
-	notifyNext(outerValue, innerValue, outerIndex, innerIndex, innerSub) {
+	notifyNext(outerValue, innerValue, outerIndex) {
 		this.values[outerIndex] = innerValue;
+
 		if (this.toRespond.length > 0) {
 			const found = this.toRespond.indexOf(outerIndex);
+
 			if (found !== -1) {
 				this.toRespond.splice(found, 1);
 			}
@@ -551,20 +526,24 @@ class WithLatestFromSubscriber extends OuterSubscriber {
 	}
 
 	notifyComplete() {
-		// noop
+		// Noop
 	}
 
-	_next(value) {
+	innerNext(value) {
 		if (this.toRespond.length === 0) {
 			const args = [value, ...this.values];
+
 			if (this.project) {
-				let result;
+				let result = null;
+
 				try {
 					result = this.project(args);
 				} catch (err) {
 					this.destination.error(err);
+
 					return;
 				}
+
 				this.destination.next(result);
 			} else {
 				this.destination.next(args);
@@ -575,18 +554,21 @@ class WithLatestFromSubscriber extends OuterSubscriber {
 
 export function withLatestFrom(...args) {
 	return (source) => {
-		let project;
+		let project = null;
+
 		if (typeof args[args.length - 1] === 'function') {
 			project = args.pop();
 		}
+
 		const observables = args;
-		return source.lift((subscriber) => {
-			return source.subscribe(new WithLatestFromSubscriber(subscriber, observables, project));
-		});
+
+		return source.lift((subscriber) => source.subscribe(new WithLatestFromSubscriber(subscriber, observables, project)));
 	};
 }
 
 class SwitchFirstMapSubscriber extends OuterSubscriber {
+	[Symbol.toStringTag] = 'SwitchFirstMapSubscriber';
+
 	constructor(destination, project, resultSelector) {
 		super(destination);
 		this.project = project;
@@ -596,11 +578,7 @@ class SwitchFirstMapSubscriber extends OuterSubscriber {
 		this.index = 0;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'SwitchFirstMapSubscriber';
-	}
-
-	_next(value) {
+	innerNext(value) {
 		if (!this.hasSubscription) {
 			this.tryNext(value);
 		}
@@ -609,22 +587,25 @@ class SwitchFirstMapSubscriber extends OuterSubscriber {
 	tryNext(value) {
 		try {
 			const result = this.project(value, this.index);
+
 			this.hasSubscription = true;
 			this.add(subscribeToResult(this, result, value, this.index));
 		} catch (err) {
 			this.destination.error(err);
 		}
+
 		this.index += 1;
 	}
 
-	_complete() {
+	innerComplete() {
 		this.hasCompleted = true;
+
 		if (!this.hasSubscription) {
 			this.destination.complete();
 		}
 	}
 
-	notifyNext(outerValue, innerValue, outerIndex, innerIndex, innerSub) {
+	notifyNext(outerValue, innerValue, outerIndex, innerIndex) {
 		if (this.resultSelector) {
 			this.trySelectResult(outerValue, innerValue, outerIndex, innerIndex);
 		} else {
@@ -635,6 +616,7 @@ class SwitchFirstMapSubscriber extends OuterSubscriber {
 	trySelectResult(outerValue, innerValue, outerIndex, innerIndex) {
 		try {
 			const result = this.resultSelector(outerValue, innerValue, outerIndex, innerIndex);
+
 			this.destination.next(result);
 		} catch (err) {
 			this.destination.error(err);
@@ -648,6 +630,7 @@ class SwitchFirstMapSubscriber extends OuterSubscriber {
 	notifyComplete(innerSub) {
 		this.remove(innerSub);
 		this.hasSubscription = false;
+
 		if (this.hasCompleted) {
 			this.destination.complete();
 		}
@@ -655,14 +638,12 @@ class SwitchFirstMapSubscriber extends OuterSubscriber {
 }
 
 export function exhaustMap(project, resultSelector) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new SwitchFirstMapSubscriber(subscriber, project, resultSelector));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new SwitchFirstMapSubscriber(subscriber, project, resultSelector)));
 }
 
 class HandlePromiseSubscriber extends Subscriber {
+	[Symbol.toStringTag] = 'HandlePromiseSubscriber';
+
 	constructor(destination, thenHandler, catchHandler) {
 		super(destination);
 		this.thenHandler = thenHandler;
@@ -670,14 +651,9 @@ class HandlePromiseSubscriber extends Subscriber {
 		this.count = 0;
 	}
 
-	get [Symbol.toStringTag]() {
-		return 'HandlePromiseSubscriber';
-	}
-
-	_next(promise) {
-		let afterThen;
+	innerNext(promise) {
 		try {
-			if (!!this.thenHandler) {
+			if (this.thenHandler) {
 				promise.then((...args) => {
 					this.destination.next(this.thenHandler(...args));
 				});
@@ -687,7 +663,7 @@ class HandlePromiseSubscriber extends Subscriber {
 				});
 			}
 
-			if (!!this.catchHandler) {
+			if (this.catchHandler) {
 				promise.catch((err) => {
 					this.destination.next(this.catchHandler(err));
 				});
@@ -703,9 +679,5 @@ class HandlePromiseSubscriber extends Subscriber {
 }
 
 export function handlePromise(thenHandler, catchHandler) {
-	return (source) => {
-		return source.lift((subscriber) => {
-			return source.subscribe(new HandlePromiseSubscriber(subscriber, thenHandler, catchHandler));
-		});
-	};
+	return (source) => source.lift((subscriber) => source.subscribe(new HandlePromiseSubscriber(subscriber, thenHandler, catchHandler)));
 }

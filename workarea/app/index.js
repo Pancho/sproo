@@ -1,68 +1,51 @@
-import { App } from '../fiu/js/app.js';
-import { LogLevels } from '../fiu/js/logging.js';
-import { DemoPageComponent } from './pages/demo/demo.js';
-import { EmptyPageComponent } from './pages/empty/empty.js';
-import { NotFoundComponent } from './pages/not-found/not-found.js';
+import App from '../fiu/js/app.js';
 
-class Demo extends App {
-	constructor(config) {
-		super(
-			config,
-		);
-	}
-}
 
-new Demo({
+new App({
 	routeRoot: 'http://localhost',
-	homePage: {
-		component: DemoPageComponent,
-	},
-	notFound: {
-		component: NotFoundComponent,
-	},
+	staticRoot: '',
+	homePage: {component: '/app/pages/demo/demo.js'},
+	notFound: {component: '/app/pages/not-found/not-found.js'},
 	routes: [
 		{
+			path: '/baza-test-range',
+			component: '/app/pages/baza/baza.js',
+		},
+		{
+			path: '/baza-test-range/charts',
+			component: '/app/pages/baza-charts/baza-charts.js',
+		},
+		{
+			path: '/baza-test-range/forms',
+			component: '/app/pages/baza-forms/baza-forms.js',
+		},
+		{
+			path: '/baza-test-range/cards',
+			component: '/app/pages/baza-cards/baza-cards.js',
+		},
+		{
+			path: '/baza-test-range/tables',
+			component: '/app/pages/baza-tables/baza-tables.js',
+		},
+		{
 			path: '/empty',
-			component: EmptyPageComponent,
+			component: '/app/pages/empty/empty.js',
 		},
 		{
 			path: '/empty/:paramTest',
-			component: EmptyPageComponent,
+			component: '/app/pages/empty/empty.js',
 		},
-	],
-	rootComponents: [
-		DemoPageComponent,
-		EmptyPageComponent,
-		NotFoundComponent,
+		{
+			path: '/baza-forms',
+			component: '/app/pages/baza-forms/baza-forms.js',
+		},
 	],
 	rootStylesheets: [
 		'/fiu/css/meta',
 		'/fiu/css/normalize',
 	],
-	authenticationClass: null,
+	authenticationModule: null,
 	httpEndpointStub: 'http://localhost',
 	onAppReady: [],
-	providers: [
-		DemoPageComponent.STORE_PROVIDER,
-	],
-	loggerConfig: {
-		level: LogLevels.TRACE,
-		// handler: (message) => {
-		// 	const formData = new FormData();
-		//
-		// 	formData.append('source', message.data.source);
-		// 	formData.append('arguments', message.data.arguments);
-		// 	formData.append('level', message.data.level);
-		// 	const headers = {
-		// 		'Accept': 'application/json, text/plain, */*',
-		// 		'X-Requested-With': 'XMLHttpRequest',
-		// 	}, options = {
-		// 		method: 'POST',
-		// 		headers: headers,
-		// 		body: formData,
-		// 	};
-		//
-		// 	return fetch('http://localhost/logging', options);
-		// },
-	},
+	loggerConfig: {level: 'trace'},
 });

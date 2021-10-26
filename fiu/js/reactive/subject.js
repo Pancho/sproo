@@ -1,24 +1,19 @@
-import { Observable } from './observable.js';
-import { SubjectSubscription, Subscription } from './subscriber.js';
+import {Observable} from './observable.js';
+import {SubjectSubscription, Subscription} from './subscriber.js';
 
 export class Subject extends Observable {
+	[Symbol.toStringTag] = 'Subject';
 	observers = [];
 	closed = false;
 	stopped = false;
 	hasError = false;
 	thrownError = null;
 
-	constructor() {
-		super();
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'Subject';
-	}
-
 	lift(operator) {
 		const subject = new AnonymousSubject(this, this);
+
 		subject.operator = operator;
+
 		return subject;
 	}
 
@@ -26,11 +21,13 @@ export class Subject extends Observable {
 		if (this.closed) {
 			throw new Error('Unsubscribe Error');
 		}
+
 		if (!this.stopped) {
-			const {observers} = this;
-			const len = observers.length;
-			const copy = observers.slice();
+			const {observers} = this,
+				len = observers.length,
+				copy = observers.slice();
 			let i = 0;
+
 			for (; i < len; i += 1) {
 				copy[i].next(value);
 			}
@@ -41,16 +38,19 @@ export class Subject extends Observable {
 		if (this.closed) {
 			throw new Error('Unsubscribe Error');
 		}
+
 		this.hasError = true;
 		this.thrownError = err;
 		this.stopped = true;
-		const {observers} = this;
-		const len = observers.length;
-		const copy = observers.slice();
+		const {observers} = this,
+			len = observers.length,
+			copy = observers.slice();
 		let i = 0;
+
 		for (; i < len; i += 1) {
 			copy[i].error(err);
 		}
+
 		this.observers.length = 0;
 	}
 
@@ -58,14 +58,17 @@ export class Subject extends Observable {
 		if (this.closed) {
 			throw new Error('Unsubscribe Error');
 		}
+
 		this.stopped = true;
-		const {observers} = this;
-		const len = observers.length;
-		const copy = observers.slice();
+		const {observers} = this,
+			len = observers.length,
+			copy = observers.slice();
 		let i = 0;
+
 		for (; i < len; i += 1) {
 			copy[i].complete();
 		}
+
 		this.observers.length = 0;
 	}
 
@@ -75,39 +78,40 @@ export class Subject extends Observable {
 		this.observers = null;
 	}
 
-	_trySubscribe(subscriber) {
+	internalTrySubscribe(subscriber) {
 		if (this.closed) {
 			throw new Error('Subject closed');
 		} else {
-			return super._trySubscribe(subscriber);
+			return super.internalTrySubscribe(subscriber);
 		}
 	}
 
-	_subscribe(subscriber) {
+	internalSubscribe(subscriber) {
 		if (this.closed) {
 			throw new Error('Subject closed');
 		} else if (this.hasError) {
 			subscriber.error(this.thrownError);
+
 			return Subscription.EMPTY;
 		} else if (this.stopped) {
 			subscriber.complete();
+
 			return Subscription.EMPTY;
 		} else {
 			this.observers.push(subscriber);
+
 			return new SubjectSubscription(this, subscriber);
 		}
 	}
 }
 
 export class AnonymousSubject extends Subject {
+	[Symbol.toStringTag] = 'AnonymousSubject';
+
 	constructor(destination, source) {
 		super();
 		this.destination = destination;
 		this.source = source;
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'AnonymousSubject';
 	}
 
 	next(value) {
@@ -128,36 +132,35 @@ export class AnonymousSubject extends Subject {
 		}
 	}
 
-	_subscribe(subscriber) {
+	internalSubscribe(subscriber) {
 		if (this.source) {
 			return this.source.subscribe(subscriber);
-		} else {
-			return Subscription.EMPTY;
 		}
+
+		return Subscription.EMPTY;
 	}
 }
 
 export class BehaviorSubject extends Subject {
-	_value;
+	[Symbol.toStringTag] = 'BehaviorSubject';
+	innerValue;
 
 	constructor(value) {
 		super();
-		this._value = value;
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'BehaviorSubject';
+		this.innerValue = value;
 	}
 
 	get value() {
 		return this.getValue();
 	}
 
-	_subscribe(subscriber) {
-		const subscription = super._subscribe(subscriber);
+	internalSubscribe(subscriber) {
+		const subscription = super.internalSubscribe(subscriber);
+
 		if (subscription && !subscription.closed) {
-			subscriber.next(this._value);
+			subscriber.next(this.innerValue);
 		}
+
 		return subscription;
 	}
 
@@ -167,11 +170,11 @@ export class BehaviorSubject extends Subject {
 		} else if (this.closed) {
 			throw new Error('BehaviorSubject closed');
 		} else {
-			return this._value;
+			return this.innerValue;
 		}
 	}
 
 	next(value) {
-		super.next(this._value = value);
+		super.next(this.innerValue = value);
 	}
 }

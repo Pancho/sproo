@@ -21,13 +21,7 @@
 * own). Each of those provides only two other properties, like so:
 *
 * specialBlob = {
-*   component: MyGreatComponent,
-*   hooks: { // Totally optional, see "hooks" for more info on when, how any why each fires
-*       before: () => {},
-*       after: () => {},
-*       already: () => {},
-*       leave: () => {},
-*   }
+*   component: MyGreatComponent
 * }
 *
 * should you want to add some guards for these two, just add the invocation to the before hook (for others it's automatic, should a guard
@@ -45,13 +39,7 @@
 * },
 * {
 *   path: '/main',
-*	component: MainComponent,
-*   hooks: {
-*       before: (done, params) => {}, // This gets executed before we load this component (for instance to check permissions, default will do exactly that)
-*       after: (params) => {}, // This gets executed after your component is loaded (not necessarily rendered though, that depends on the component)
-*       already: (params) => {}, // This gets executed if one requests this route again (so it doesn't do anything but call this hook, should you need to cover that scenario)
-*       leave: (params) => {}, // This gets called after one requests new route (like onbeforeunload, but not exactly like that) and unloads this one
-*   }
+*   component: MainComponent
 * },
 * {
 * ...
@@ -73,12 +61,12 @@
 * increases url readability, even google recommends this: https://support.google.com/webmasters/answer/76329?hl=en) and camelCase
 * convention for naming your parameters (you're writing JS not Python)
 *
-* While hooks are optional and pretty simple to understand, I need to stress that component must extend Component class (from
-* ./fiu/component.js) and follow the convention or unexpected things may happen. It might be so that this could work without that
-* class in between, but I did not spend a single second trying that scenario out, and most likely will not.
 * Do not try to make a path like '' or '/', because those (or that) are a special case called homePage and are reserved for that.
 */
-export class Router {
+
+export default class Router {
+	[Symbol.toStringTag] = 'Router';
+	static instance;
 	routeRoot = null;
 	routes = [];
 	lastRouteResolved = {};
@@ -86,10 +74,8 @@ export class Router {
 	notFoundRoute = null;
 	destroyed = false;
 
-	static instance;
-
 	constructor(routeRoot, homePage, notFound, routes, authenticationUrl) {
-		if (!!Router.instance) {
+		if (Router.instance) {
 			throw new Error('Only one instance of Router allowed');
 		}
 
@@ -98,124 +84,93 @@ export class Router {
 		this.routeRoot = routeRoot;
 		this.authenticationUrl = authenticationUrl;
 
-		window.addEventListener('popstate', this.resolve);
-		this.updatePageLinks();
+		window.addEventListener('popstate', (state) => this.resolve(state.target.location.href));
 
 		this.homePageRoute = {
-			handler: () => RouterUtils.inject(new homePage.component()),
-			hooks: homePage.hooks,
+			handler: async () => {
+				await RouterUtils.inject(homePage.component);
+			},
 		};
 		this.notFoundRoute = {
-			handler: () => RouterUtils.inject(new notFound.component()),
-			hooks: notFound.hooks,
+			handler: async () => {
+				await RouterUtils.inject(notFound.component);
+			},
 		};
 
-		(routes || []).forEach((route, index) => {
-			this.on(
-				route.path,
-				params => {
-					try {
-						params = params || [];
-						RouterUtils.inject(new route.component(...params));
-					} catch (e) {
-						console.log('Check whether you\'ve imported the declared your component in the app or in the child component');
-						throw e;
-					}
-				},
-				{
-					before: (done, params) => {
-						if (!!route.guard) {
-							const guard = new route.guard();
-							guard.guard(this, route).then(result => {
-								done(result);
-							});
-						} else {
-							done();
-						}
-					},
-					...route.hooks,
-				},
-			);
-		});
-		this.resolve();
-	}
+		if (Array.isArray(routes)) {
+			routes.forEach((route) => {
+				this.add(
+					route.path,
+					(params) => {
+						const componentParams = params || [];
 
-	get [Symbol.toStringTag]() {
-		return 'Router';
+						if (route.guard) {
+							return import(route.guard).then((guardModule) => {
+								const guard = new guardModule.default(this, route);
+
+								return guard.guard(this, route).then((result) => {
+									if (result) {
+										return RouterUtils.inject(route.component, ...componentParams);
+									}
+
+									return false;
+								});
+							});
+						}
+
+						return RouterUtils.inject(route.component, ...componentParams);
+					},
+				);
+			});
+		}
+
+		this.resolve();
 	}
 
 	destroy() {
 		this.routes = [];
 		this.destroyed = true;
 
-		window.removeEventListener('popstate', this.resolve);
+		window.removeEventListener('popstate', (state) => this.resolve(state.target.location.href));
 	}
 
-	add(route, handler = null, hooks = null) {
+	add(route, handler = null) {
+		let internalRoute = '';
+
 		if (typeof route === 'string') {
-			route = encodeURI(route);
+			internalRoute = encodeURI(route);
 		}
+
 		this.routes.push({
-			path: route,
+			path: internalRoute,
 			handler: handler,
-			hooks: hooks,
-		});
-
-		return this.add;
-	}
-
-	on(...args) {
-		this.add(...args);
-		return this;
-	}
-
-	updatePageLinks(doc) {
-		doc = doc || document;
-		doc.addEventListener('click', (event) => {
-			let target = event.target;
-			for (; !!target && !!target.parentElement; target = target.parentNode) {
-				if (target.matches('[route]')) {
-					if ((event.ctrlKey || event.metaKey) && event.target.tagName.toLowerCase() === 'a') {
-						return false;  // Could do preventDefault, but would return either way, so this is actually perfectly fine
-					}
-
-					const location = target.getAttribute('route');
-
-					if (!this.destroyed) {
-						event.preventDefault();
-						this.navigate(
-							location
-								.replace(RouterUtils.CLEAN_TRAILING_SLASH, '')
-								.replace(RouterUtils.CLEAN_LEADING_SLASH, '/'),
-							{...target.dataset},  // "cast" to dict
-						);
-					}
-					break;
-				}
-			}
 		});
 	}
 
 	navigate(location, data) {
-		data = data || {};
-		location = location || '';
+		const internalData = data || {},
+			internalLocation = location || '';
+
 		window.history.pushState(
-			data,
+			internalData,
 			// Here's the thing about this param... this would replace the title tag, so each page could have a unique
-			// title, but of all the browsers, only Safari uses this, and I don't want to test it, to see if this is
-			// even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
-			// for the SEO anyway.
+			// Title, but of all the browsers, only Safari uses this, and I don't want to test it, to see if this is
+			// Even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
+			// For the SEO anyway.
 			'',
-			(`${this.routeRoot}/${location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')}`).replace(/([^:])(\/{2,})/g, '$1/'),
+			`${ this.routeRoot }/${ internalLocation.replace(RouterUtils.CLEAN_LEADING_SLASH, '/') }`.replace(/([^:])(\/{2,})/gu, '$1/'),
 		);
-		this.resolve();
-		return this;
+
+		return this.resolve();
 	}
 
 	match(path) {
 		return this.routes
-			.map(route => {
-				const {regexp, paramNames} = RouterUtils.replaceDynamicURLParts(RouterUtils.clean(route.path)),
+			.map((route) => {
+				const {
+						regexp,
+						paramNames,
+					} = RouterUtils.replaceDynamicURLParts(RouterUtils.clean(route.path)),
 					match = path.replace(RouterUtils.CLEAN_LEADING_SLASH, '/').match(regexp),
 					params = RouterUtils.regExpResultToParams(match, paramNames);
 
@@ -224,78 +179,48 @@ export class Router {
 					route: route,
 					params: params,
 				} : false;
-			}).filter(match => match)[0];
-	}
-
-	callLeave() {
-		const lastRouteResolved = this.lastRouteResolved;
-
-		if (lastRouteResolved && lastRouteResolved.hooks && lastRouteResolved.hooks.leave) {
-			lastRouteResolved.hooks.leave(lastRouteResolved.params);
-		}
+			}).filter((match) => match)[0];
 	}
 
 	resolve(current) {
 		const url = current || RouterUtils.clean(window.location.href),
-			path = RouterUtils.splitURL(url.replace(this.routeRoot, ''));
+			path = RouterUtils.splitURL(url.replace(this.routeRoot, '')),
+			match = this.match(path);
 
-		if (!!this.lastRouteResolved && this.lastRouteResolved.path === path) {
-			if (!!this.lastRouteResolved.hooks && !!this.lastRouteResolved.hooks.already) {
-				this.lastRouteResolved.hooks.already(this.lastRouteResolved.params);
-			}
+		if (Boolean(this.lastRouteResolved) && this.lastRouteResolved.path === path) {
 			return false;
 		}
 
-		const match = this.match(path);
-
-		if (!!match) {
-			this.callLeave();
+		if (match) {
 			this.lastRouteResolved = {
 				path: path,
-				hooks: match.route.hooks,
 				params: match.params,
 			};
 
-			const handler = match.route.handler;
-			RouterUtils.manageHooks(() => {
-				match.route.path instanceof RegExp ?
-					handler((match.match.slice(1, match.match.length))) :
-					handler(match.params);
-			}, match.route.hooks, match.params);
-			return match;
-		} else if (!!this.homePageRoute && (path === '' || path === '/')) {
-			RouterUtils.manageHooks(() => {
-				this.callLeave();
-				this.lastRouteResolved = {
-					path: path,
-					hooks: this.homePageRoute.hooks,
-				};
-				this.homePageRoute.handler();
-			}, this.homePageRoute.hooks);
-		} else if (!!this.notFoundRoute) {
-			RouterUtils.manageHooks(() => {
-				this.callLeave();
-				this.lastRouteResolved = {
-					path: path,
-					hooks: this.notFoundRoute.hooks,
-				};
-				this.notFoundRoute.handler();
-			}, this.notFoundRoute.hooks);
+			return match.route.handler(match.params);
+		} else if (Boolean(this.homePageRoute) && (path === '' || path === '/')) {
+			this.lastRouteResolved = {path: path};
+
+			return this.homePageRoute.handler();
+		} else if (this.notFoundRoute) {
+			this.lastRouteResolved = {path: path};
+
+			return this.notFoundRoute.handler();
 		}
+
 		return false;
 	}
 }
 
 class RouterUtils {
-	static DEPTH_TRAILING_SLASH = new RegExp(/\/$/);
-	static CLEAN_TRAILING_SLASH = new RegExp(/\/+$/);
-	static CLEAN_LEADING_SLASH = new RegExp(/^\/+/);
-	static PARAMETER_REGEXP = new RegExp(/([:*])(\w+)/g);
-	static WILDCARD_REGEXP = new RegExp(/\*/g);
-	static SPLIT_GET_PARAMETERS = new RegExp(/\?(.*)?$/);
-	static REPLACE_VARIABLE_REGEXP = '([^\/]+)';
+	static CLEAN_TRAILING_SLASH = /\/+$/u;
+	static CLEAN_LEADING_SLASH = /^\/+/u;
+	static PARAMETER_REGEXP = /([:*])(\w+)/gu;
+	static WILDCARD_REGEXP = /\*/gu;
+	static SPLIT_GET_PARAMETERS = /\?(.*)?$/u;
+	static REPLACE_VARIABLE_REGEXP = '([^/]+)';
 	static REPLACE_WILDCARD = '(?:.*)';
-	static FOLLOWED_BY_SLASH_REGEXP = '(?:\/$|$)';
+	static FOLLOWED_BY_SLASH_REGEXP = '(?:/$|$)';
 
 	static clean(url) {
 		return url.replace(RouterUtils.CLEAN_TRAILING_SLASH, '').replace(RouterUtils.CLEAN_LEADING_SLASH, '^/').split('#')[0];
@@ -307,7 +232,7 @@ class RouterUtils {
 
 	static replaceDynamicURLParts(route) {
 		const paramNames = [];
-		let regexp;
+		let regexp = null;
 
 		if (route instanceof RegExp) {
 			regexp = route;
@@ -316,11 +241,14 @@ class RouterUtils {
 				route
 					.replace(RouterUtils.PARAMETER_REGEXP, function (full, dots, name) {
 						paramNames.push(name);
+
 						return RouterUtils.REPLACE_VARIABLE_REGEXP;
 					})
 					.replace(RouterUtils.WILDCARD_REGEXP, RouterUtils.REPLACE_WILDCARD) + RouterUtils.FOLLOWED_BY_SLASH_REGEXP,
+				'u',
 			);
 		}
+
 		return {
 			regexp,
 			paramNames,
@@ -338,46 +266,16 @@ class RouterUtils {
 
 		return match
 			.slice(1, match.length)
-			.reduce((params, value, index) => {
-				if (params === null) {
-					params = [];
-				}
-				params.push(decodeURIComponent(value));
-				return params;
+			.reduce((params, value) => {
+				const result = params ? params : [];
+
+				result.push(decodeURIComponent(value));
+
+				return result;
 			}, null);
 	}
 
-	static manageHooks(handler, hooks, params) {
-		if (!!hooks && typeof hooks === 'object') {
-			if (!!hooks.before) {
-				hooks.before((shouldRoute = true) => {
-					if (!shouldRoute) {
-						return;
-					}
-					handler();
-					if (!!hooks.after) {
-						hooks.after(params);
-					}
-				}, params);
-				return;
-			} else if (!!hooks.after) {
-				handler();
-				hooks.after(params);
-				return;
-			}
-		}
-		handler();
-	}
-
-	static getUrlDepth(url) {
-		return url.replace(RouterUtils.DEPTH_TRAILING_SLASH, '').split('/').length;
-	}
-
-	static compareUrlDepth(urlA, urlB) {
-		return RouterUtils.getUrlDepth(urlB) - RouterUtils.getUrlDepth(urlA);
-	}
-
-	static inject(component) {
+	static inject(component, ...params) {
 		const outlet = document.querySelector('router-outlet');
 
 		if (!outlet) {
@@ -388,8 +286,25 @@ class RouterUtils {
 			if (outlet.firstChild.unload) {
 				outlet.firstChild.unload();
 			}
+
 			outlet.removeChild(outlet.firstChild);
 		}
-		outlet.appendChild(component);
+
+		return new Promise((resolve) => {
+			import(component).then((module) => {
+				if (!module || !module.default) {
+					throw new Error(`We cannot render a component from module ${ module }`);
+				}
+
+				if (!customElements.get(module.default.tagName)) {
+					customElements.define(module.default.tagName, module.default);
+				}
+
+				outlet.appendChild(new module.default(...params));
+				resolve();
+			}).catch((error) => {
+				throw new Error(error);
+			});
+		});
 	}
 }

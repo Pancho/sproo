@@ -2,17 +2,14 @@
  * You are supposed to extend this class, not just use it (even though it should be fine if you do, but if you don't use it, app will, so
  * don't worry). Such as it is, this implementation will not do a damn thing, just pass everything through.
  */
-export class Authentication {
+export default class Authentication {
+	[Symbol.toStringTag] = 'Authentication';
 	constructor() {
-		if (!!Authentication.instance) {
+		if (Authentication.instance) {
 			throw new Error('Only one instance of Authentication allowed');
 		}
 
 		Authentication.instance = this;
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'Authentication';
 	}
 
 	/**

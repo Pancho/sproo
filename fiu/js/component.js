@@ -1,6 +1,6 @@
-'use strict';
-import { App } from './app.js';
-import { Utils } from './utils.js';
+import App from './app.js';
+import {uniqueBy} from './utils/array.js';
+import utils from './utils/index.js';
 
 /* I wanted to have this "middleman", due to JS not supporting real decorators yet, to avoid boilerplate in the actual
 * component/element class implementation. I insist on not using babels and some obscure pollyfills, to achieve decorator like effect,
@@ -12,7 +12,7 @@ import { Utils } from './utils.js';
 *
 * Let's suppose you wanted to have a custom html element with a tag named "navigation". First you would have to define a new class, as such:
 *
-* class Navigation extends HTMLElement { // What a time we live in... JS has classes now, and COVID-19 is reducing us into 17th century plebs.
+* class Navigation extends HTMLElement { // What a time to live in... JS has classes now, and COVID-19 has reduced us to 17th century plebs.
 *       constructor() {
 *           super(); // Yes, semicolons are super important!
 *       }
@@ -34,7 +34,7 @@ import { Utils } from './utils.js';
 *               template = '<div><p>Some text in my awesome component</p></div>',
 *               someElement = document.createElement('some');
 *
-*           style.textContent = '\/* a bunch of css... that gets inserted into every single instance of this component class... neat, possibly a single large css or generated poop from a scss file *\/';
+*           style.textContent = '\/* a bunch of css... *\/'';
 *           shadowRoot.append(style);
 *           shadowRoot.append(someElement);
 *           // or
@@ -133,31 +133,39 @@ import { Utils } from './utils.js';
 *
 * So... in the end, you would end with the folder structure mentioned at the "template" section and a class looking like this:
 *
-* import { Component } from './sablono/fiu/component.js';
+* import Component from './sablono/fiu/component.js';
 *
 * export class TagComponent extends Component {
-* 	static tagName = 'tag';
-* 	static template = 'domain/tag';
-* 	static stylesheets = [
-* 		'reset',
-* 		'domain/tag',
-* 	];
+*     static tagName = 'tag';
+*     static template = 'domain/tag';
+*     static stylesheets = [
+*         'reset',
+*         'domain/tag',
+*     ];
 *
-* 	constructor(params) { // For params, see sablono/fiu/router.js
-* 		super();
-*       // Your code here
-* 	} // You may omit the constructor alltogether
+*     constructor(params) { // For params, see sablono/fiu/router.js
+*         super();
+*         // Your code here
+*     } // You may omit the constructor altogether
 * }
 */
 
-export class Component extends HTMLElement {
-	// This property tells whether this component has been removed from the host document
-	unloaded = false;
 
+const CLEAN_TRAILING_SLASH = /\/+$/u,
+	CLEAN_LEADING_SLASH = /^\/+/u,
+	PROPERTY_NAMES_MAP = {'text-content': 'textContent'};
+
+
+export default class Component extends HTMLElement {
+	[Symbol.toStringTag] = 'Component';
+	// Promise that's resolved when the onTemplateLoaded has already been executed
+	templateLoaded;
 	// Index of bound elements. Can change during runtime as it gets updated (or rather overwritten) on every mutation.
 	bindingIndex = {};
-
-	// Promise that's resolved when the onTemplateLoaded has already been executed
+	// If element Index
+	ifIndex = {};
+	// For-each element Index
+	forEachIndex = {};
 
 	/* Creates an instance of Component, which is really just a convenience wrapper for HTMLElement (the actual component)
 	*
@@ -169,154 +177,138 @@ export class Component extends HTMLElement {
 
 		// Template context, from which the template gets updated
 		this.templateContext = {};
+		this.attachShadow({mode: 'open'});
 
-		this.attachShadow({
-			mode: 'open',
-		});
+		const importPromises = [],
+			templateReady = new Promise((resolve) => {
+				if (this.constructor.template) {
+					utils.Loader.getTemplateHTML(this.constructor.template, resolve);
+				} else {
+					resolve();
+				}
+			}),
+			styleSheetPromises = [];
 
-		const styleSheetPromises = [];
-		if (!!this.constructor.stylesheets) {
-			this.constructor.stylesheets.forEach(stylesheet => {
+		if (this.constructor.stylesheets) {
+			this.constructor.stylesheets.forEach((stylesheet) => {
 				styleSheetPromises.push(
-					new Promise(resolve => Utils.getCSS(stylesheet, resolve)),
+					new Promise((resolve) => {
+						utils.Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
+					}),
 				);
 			});
 		}
 
-		const injections = App.inject(this.constructor);
-		Object.entries(injections).forEach(([propertyName, injection]) => {
-			this[propertyName] = injection;
-		});
-		if (!!App.loggerFactory) {
+		if (this.constructor.registerComponents) {
+			this.constructor.registerComponents.forEach((component) => {
+				importPromises.push(import(component));
+			});
+		}
+
+		this.app = App.instance;
+
+		if (App.loggerFactory) {
 			this.logger = App.loggerFactory.getLogger(this.constructor);
 		}
 
-		if (!!this.constructor.registerComponents) {
-			this.constructor.registerComponents.forEach((component) => {
-				if (!customElements.get(component.tagName)) {  // Should not load twice, right
-					customElements.define(component.tagName, component);
-				}
-				Object.keys(injections).forEach((propertyName) => {
-					component.prototype[propertyName] = injections[propertyName];
-				});
-			});
-		}
+		this.templateLoaded = new Promise((resolve) => {
+			/* This is the list of all the properties on Component instance. We use this to filter them out, so we're left only with the
+			 properties on the inherited class's instance.
+			*/
+			const baseProperties = Object.keys(this);
 
-		const templateReady = new Promise(resolve => {
-			if (!!this.constructor.template) {
-				Utils.getTemplateHTML(this.constructor.template, resolve);
-			} else {
-				resolve();
-			}
-		});
+			Promise.all([templateReady, ...styleSheetPromises]).then(([templateDocument, ...stylesheets]) => {
+				const initialContext = {},
+					obj = this;
 
-		this.templateLoaded = new Promise(resolve => {
-			Promise.all([
-				App.appReady,
-				templateReady,
-				...styleSheetPromises,
-			]).then(([app, templateDocument, ...stylesheets]) => {
-				this.app = app;
-				if (!!templateDocument) {
-					// const measurements = [];
-					// for (let i = 0; i < 10; i += 1) {
-					// 	const start = performance.now();
-					// 	this.gatherFiuAttributes(templateDocument);
-					// 	const end = performance.now()
-					// 	measurements.push(end - start);
-					// }
-					// console.log(this.tagName, 'gatherFiuAttributes avg: ', measurements.reduce((prev, curr) => prev + curr, 0), measurements.reduce((prev, curr) => prev + curr, 0) / measurements.length);
-					this.shadowRoot.innerHTML = templateDocument;
-					this.gatherFiuAttributes(this.shadowRoot);
-					// this.shadowRoot.append(templateDocument);
-					this.shadowRoot.adoptedStyleSheets = stylesheets;
-					this.app.router.updatePageLinks(this.shadowRoot);
-					this.onTemplateLoaded();
-					resolve();
-				}
-			});
-		});
-	}
+				Object.getOwnPropertyNames(this)
+					.filter((name) => !baseProperties.includes(name))
+					.forEach(function (name) {
+						const internalName = `fiuInternal-${ name }`;
 
-	get [Symbol.toStringTag]() {
-		return 'Component';
-	}
+						initialContext[name] = obj[name];
+						Object.defineProperty(obj, internalName, {
+							writable: true,
+							value: obj[name],
+						});
 
-	gatherFiuAttributes(templateDocument) {
-		templateDocument.querySelectorAll('*').forEach(refElement => {
-			const attributeNames = refElement.getAttributeNames();
-			if (attributeNames.length > 0) {
-				attributeNames.forEach(attributeName => {
-					if (attributeName === 'fiu-ref') {
-						this[refElement.getAttribute(attributeName)] = refElement;
-					} else if (attributeName.startsWith('(') && attributeName.endsWith(')')) {
-						const eventName = attributeName.replace('(', '').replace(')', '').trim(),
-							handlerName = refElement.getAttribute(attributeName);
-						if (typeof this[handlerName] === 'function') {
-							refElement.addEventListener(eventName, ev => this[handlerName].call(this, ev));
-						} else {
-							console.log(`Handler ${handlerName} not present on component`);
+						Object.defineProperty(obj, name, {
+							get: function () {
+								return obj[internalName];
+							},
+							set: function (value) {
+								obj[internalName] = value;
+								Component.setContext(obj, obj, obj.shadowRoot, {[name]: value});
+							},
+						});
+
+						/* For the variables containing immutable values, the proxy is not necessary, the wrapper is enough as only
+						(re)assignments will change the values */
+						if (typeof obj[name] !== 'object') {
+							return false;
 						}
-					} else if (attributeName.startsWith('[') && attributeName.endsWith(']')) {
-						let propertyName = attributeName.replace('[', '').replace(']', '').trim();
-						if (propertyName.includes('.')) {
-							propertyName = propertyName.replace('.', '\\.');
-						}
-						this.bindingIndex[refElement.getAttribute(attributeName)] = propertyName;
-					}
-				});
-			}
-		});
-	}
 
-	get context() {
-		return this.templateContext;
-	}
-
-	set context(change) {
-		if (!Component.isObject(change)) {
-			throw Error(`Context has to be updated with an object. Got ${change}`);
-		}
-
-		this.templateContext = {
-			...this.templateContext,
-			...change,
-		};
-
-		Object.entries(change).forEach(([key, value]) => {
-			const selectorKeys = Component.isObject(value) ? [key, ...Component.spreadPath(key, value).flat()] : [key];
-			selectorKeys.forEach(selectorKey => {
-				if (selectorKey in this.bindingIndex) {
-					let innerAttributeName = this.bindingIndex[selectorKey];
-
-					this.getElements(`[\\[${innerAttributeName}\\]="${selectorKey}"]`).forEach(elm => {
-						const boundValue = selectorKey.split('.').reduce((blob, prevKey) => blob[prevKey], change);
-						if (innerAttributeName.includes('.')) {
-							const split = innerAttributeName.split('\\.');
-							if (split[0] === 'attr') {
-								elm.setAttribute(split[1], boundValue);
-							} else if (split[0] === 'style') {
-								elm.style[split[1]] = boundValue;
-							}
-						} else {
-							if (elm instanceof Component) {
-								elm.templateLoaded.then(() => {
-									elm.context = {
-										[innerAttributeName]: boundValue,
-									};
-									elm[innerAttributeName] = boundValue;
-								});
-							} else {
-								if (!!Utils.propertyNamesMap[innerAttributeName]) {
-									elm[Utils.propertyNamesMap[innerAttributeName]] = boundValue;
-								} else {
-									elm[innerAttributeName] = boundValue;
+						obj[name] = new utils.DeepProxy(obj[name], {
+							get: function (target, property, receiver) {
+								return obj[internalName];
+							},
+							set: function (target, property, value, receiver) {
+								if (!property.includes('length')) {
+									Component.setContext(obj, obj, obj.shadowRoot, {[name]: obj[internalName]});
 								}
-							}
-						}
+							},
+						});
+					});
+
+				if (templateDocument instanceof Node) {
+					this.shadowRoot.adoptedStyleSheets = [...stylesheets];
+					this.shadowRoot.append(templateDocument);
+					Component.processTemplate(this, this, this.shadowRoot);
+					this.updatePageLinks(this.shadowRoot);
+					Promise.all(importPromises).then(([...componentModules]) => {
+						componentModules
+							.filter((module) => !customElements.get(module.default.tagName))
+							.forEach((module) => customElements.define(module.default.tagName, module.default));
+						this.onTemplateLoaded();
+						Component.setContext(this, this, this.shadowRoot, initialContext); // Force update
+						resolve();
 					});
 				}
 			});
+		});
+	}
+
+	updatePageLinks(doc) {
+		doc.addEventListener('click', (event) => {
+			let target = event.target;
+
+			if (target instanceof Component || !doc.contains(target)) {
+				return false;
+			}
+
+			for (; Boolean(target) && Boolean(target.parentElement); target = target.parentNode) {
+				if (target.matches('[route]')) {
+					if ((event.ctrlKey || event.metaKey) && event.target.tagName.toLowerCase() === 'a') {
+						return false; // Could do preventDefault, but would return either way, so this is actually perfectly fine
+					}
+
+					const location = target.getAttribute('route');
+
+					if (!this.app.router.destroyed) {
+						event.preventDefault();
+						this.app.router.navigate(
+							location
+								.replace(CLEAN_TRAILING_SLASH, '')
+								.replace(CLEAN_LEADING_SLASH, '/'),
+							{...target.dataset}, // "cast" to dict
+						);
+					}
+
+					break;
+				}
+			}
+
+			return false; // Do not allow the click to the element actually do anything
 		});
 	}
 
@@ -338,11 +330,13 @@ export class Component extends HTMLElement {
 	* If you supply both the name and value, this method will set this attribute for this component
 	*/
 	attribute(name, value) {
-		if (value === undefined) {
-			return this.getAttribute(name);
-		} else {
+		if (value) {
 			this.setAttribute(name, value);
+
+			return value;
 		}
+
+		return this.getAttribute(name);
 	}
 
 	/*
@@ -365,7 +359,7 @@ export class Component extends HTMLElement {
 	newElement(tagName, attributes) {
 		const newElement = document.createElement(tagName);
 
-		Object.entries(attributes || {}).forEach((entry, index) => {
+		Object.entries(attributes || {}).forEach((entry) => {
 			newElement.setAttribute(...entry);
 		});
 
@@ -376,6 +370,7 @@ export class Component extends HTMLElement {
 		if (!this.parentElement) {
 			return;
 		}
+
 		this.parentElement.removeChild(this);
 	}
 
@@ -383,13 +378,239 @@ export class Component extends HTMLElement {
 		this.dispatchEvent(new CustomEvent(eventName, obj));
 	}
 
-	static spreadPath(key, value) {
-		return Object.keys(value).map(innerKey => {
-			if (Component.isObject(value[innerKey])) {
-				return [`${key}.${innerKey}`, Component.spreadPath(innerKey, value[innerKey]).map(newKey => `${key}.${newKey}`)].flat();
-			} else {
-				return `${key}.${innerKey}`;
+	getStyleElement() {
+		let style = this.getElement('style');
+
+		if (!style) {
+			style = this.newElement('style');
+			this.shadowRoot.appendChild(style);
+		}
+
+		return style;
+	}
+
+	static processTemplate(root, owner, templateDocument) {
+		Component.parseFiuAttributes(root, owner, templateDocument);
+		Component.parseForEach(owner, templateDocument);
+		Component.parseIf(owner, templateDocument);
+	}
+
+	static parseFiuAttributes(root, owner, templateDocument) {
+		templateDocument.querySelectorAll('*').forEach((refElement) => {
+			const attributeNames = refElement.getAttributeNames();
+
+			if (attributeNames.length > 0) {
+				attributeNames.forEach((attributeName) => {
+					const attributeValue = refElement.getAttribute(attributeName);
+
+					if (attributeName === 'fiu-ref') {
+						root[attributeValue] = refElement;
+					} else if (attributeName.startsWith('(') && attributeName.endsWith(')')) {
+						const eventName = attributeName.replace('(', '').replace(')', '').trim();
+
+						if (typeof root[attributeValue] === 'function') {
+							if (refElement.closest('[for-each-data]')) {
+								refElement.addEventListener(eventName, (ev) => {
+									const fiuData = ev.target.closest('[for-each-data]').fiu;
+
+									root[attributeValue](ev, fiuData.for.data, fiuData.for.index);
+								});
+							} else {
+								refElement.addEventListener(eventName, (ev) => {
+									root[attributeValue](ev);
+								});
+							}
+						} else {
+							console.warn(`Handler ${ attributeValue } not present on component`);
+						}
+					} else if (attributeName.startsWith('[') && attributeName.endsWith(']')) {
+						let propertyName = attributeName.replace('[', '').replace(']', '').trim();
+
+						if (propertyName.includes('.')) {
+							propertyName = propertyName.replace('.', '\\.');
+						}
+
+						owner.bindingIndex[attributeValue] = propertyName;
+					}
+					/* See if one can bind everything before hand and then remove the binding attributes (at least in production) so the
+						HTML looks better
+					*/
+					// RefElement.removeAttribute(attributeName);
+				});
 			}
+		});
+	}
+
+	static parseIf(owner, templateDocument) {
+		let refElement = null;
+
+		while (refElement = templateDocument.querySelector('[if]')) {
+			const attributeValue = refElement.getAttribute('if');
+			if (!owner.ifIndex[attributeValue]) {
+				owner.ifIndex[attributeValue] = [];
+			}
+
+			const clone = document.importNode(refElement, true),
+				ifElement = document.createElement('fiu-if');
+
+			refElement.parentElement.insertBefore(ifElement, refElement);
+			refElement.parentElement.removeChild(refElement);
+			owner.ifIndex[attributeValue].push({
+				elm: clone,
+				ifElement: ifElement,
+			});
+		}
+	}
+
+	static parseForEach(owner, templateDocument) {
+		let refElement = null;
+
+		while (refElement = templateDocument.querySelector('[for-each]')) {
+			const template = document.importNode(refElement, true),
+				forElement = document.createElement('fiu-for-each'),
+				split = refElement.getAttribute('for-each').split(' in '),
+				itemName = split[0].trim(),
+				itemsName = split[1].trim();
+
+			if (!owner.forEachIndex[itemsName]) {
+				owner.forEachIndex[itemsName] = [];
+			}
+
+			refElement.parentElement.insertBefore(forElement, refElement);
+			refElement.parentElement.removeChild(refElement);
+			owner.forEachIndex[itemsName].push({
+				template: template,
+				forElement: forElement,
+				itemName: itemName,
+			});
+		}
+	}
+
+	static processForEach(root, owner, key, value, inheritedContext) {
+		owner.forEachIndex[key].forEach((entry) => {
+			const forElement = entry.forElement,
+				itemName = entry.itemName,
+				parent = forElement.parentElement;
+
+			while (forElement.previousElementSibling) {
+				parent.removeChild(forElement.previousElementSibling);
+			}
+
+			value.forEach((item, index) => {
+				const template = document.importNode(entry.template, true);
+
+				template.removeAttribute('for-each');
+				template.setAttribute('for-each-data', '');
+
+				template.bindingIndex = {};
+				template.ifIndex = {};
+				template.forEachIndex = {};
+				Component.processTemplate(root, template, template);
+
+				Component.setContext(root, template, template, {
+					...inheritedContext,
+					[itemName]: item,
+					index: index,
+				});
+				template.fiu = {
+					for: {
+						data: item,
+						index: index,
+					},
+				};
+				parent.insertBefore(template, forElement);
+			});
+		});
+	}
+
+	static setContext(root, owner, templateDocument, change) {
+		if (!Component.isObject(change)) {
+			throw Error(`Context has to be updated with an object. Got ${ change }`);
+		}
+
+		owner.templateContext = {
+			...root.templateContext,
+			...owner.templateContext,
+			...change,
+		};
+
+		Object.entries(change).forEach(([key, value]) => {
+			const selectorKeys = Component.isObject(value) ? [key, ...Component.spreadPath(key, value).flat()] : [key];
+
+			selectorKeys.forEach((selectorKey) => {
+				if (selectorKey in owner.ifIndex) {
+					const extractedValue = selectorKey.split('.').slice(1).reduce((previous, current) => previous[current], value);
+
+					owner.ifIndex[selectorKey].forEach((entry) => {
+						const elm = entry.elm,
+							ifElement = entry.ifElement;
+
+						if (extractedValue) {
+							if (!elm.parentElement) {
+								// We'll just clean the removed if element form the index, as it will get recreated if needed again.
+								owner.ifIndex[selectorKey] = utils.uniqBy(owner.ifIndex[selectorKey], item => item.ifElement)
+								ifElement.parentElement.insertBefore(elm, ifElement);
+								ifElement.parentElement.removeChild(ifElement);
+							}
+						} else if (elm.parentElement) {
+							elm.parentElement.insertBefore(ifElement, elm);
+							elm.parentElement.removeChild(elm);
+						}
+					});
+				}
+
+				if (selectorKey in owner.forEachIndex) {
+					const extractedValue = selectorKey.split('.').slice(1).reduce((previous, current) => previous[current], value);
+					if (Component.isObject(extractedValue)) {
+						Component.processForEach(root, owner, selectorKey, Object.entries(extractedValue).map(([key, value]) => ({
+							key: key,
+							value: value,
+						})), owner.templateContext);
+					} else if (Array.isArray(extractedValue)) {
+						Component.processForEach(root, owner, selectorKey, extractedValue, owner.templateContext);
+					}
+				}
+
+				if (selectorKey in owner.bindingIndex) {
+					const innerAttributeName = owner.bindingIndex[selectorKey];
+
+					templateDocument.querySelectorAll(`[\\[${ innerAttributeName }\\]="${ selectorKey }"]`).forEach((elm) => {
+						const boundValue = selectorKey.split('.').reduce((blob, prevKey) => blob[prevKey], change);
+
+						if (innerAttributeName.includes('.')) {
+							const split = innerAttributeName.split('\\.');
+
+							if (split[0] === 'attr') {
+								elm.setAttribute(split[1], boundValue);
+							} else if (split[0] === 'style') {
+								elm.style[split[1]] = boundValue;
+							}
+						} else if (elm instanceof Component) {
+							elm.templateLoaded.then(() => {
+								elm[innerAttributeName] = boundValue;
+							});
+						} else if (PROPERTY_NAMES_MAP[innerAttributeName]) {
+							elm[PROPERTY_NAMES_MAP[innerAttributeName]] = boundValue;
+						} else {
+							elm[innerAttributeName] = boundValue;
+						}
+					});
+				}
+			});
+		});
+	}
+
+	static spreadPath(key, value) {
+		return Object.keys(value).map((innerKey) => {
+			if (Component.isObject(value[innerKey])) {
+				return [
+					`${ key }.${ innerKey }`, Component.spreadPath(innerKey, value[innerKey]).map(
+						(newKey) => `${ key }.${ newKey }`,
+					),
+				].flat();
+			}
+
+			return `${ key }.${ innerKey }`;
 		});
 	}
 

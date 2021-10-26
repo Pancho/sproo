@@ -10,6 +10,4 @@ caption, th, td {text-align:left;font-weight:normal;}
 blockquote:before, blockquote:after, q:before, q:after {content:"";}
 blockquote, q {quotes:"" "";}
 strong {font-weight:bold;}
-body {font-size:62.5%;font-family:'Source Sans Pro', sans-serif;}
-slot {display:block;}
-slot > * {overflow:hidden;}
+body {font-size:62.5%;font-family:sans-serif;}

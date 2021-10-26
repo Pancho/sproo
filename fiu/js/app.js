@@ -1,138 +1,103 @@
-import { Authentication } from './authentication.js';
-import { Http } from './http.js';
-import { LoggerFactory } from './logging.js';
-import { Router } from './router.js';
-import { Utils } from './utils.js';
+import Router from './router.js';
+import utils from './utils/index.js';
 
-export class App {
+
+export default class App {
+	[Symbol.toStringTag] = 'App';
 	static instance;
-	static appReady;
-	static injectionRegistry = {};
-	static loggerFactory = new LoggerFactory();
+	static staticRoot = '';
+	static loggerFactory;
 	router = null;
 	http = null;
+	ready = null;
 
 	constructor(config) {
-		let authentication,
-			styleSheetPromises = [];
+		let authenticationPath = '',
+			authenticationPromise = null,
+			httpPromise = null,
+			loggingPromise = null;
+		const styleSheetPromises = [];
 
-		if (!!App.instance) {
+		if (App.instance) {
 			throw new Error('Only one instance of App allowed');
 		}
 
-		if (!!config.rootStylesheets) {
-			config.rootStylesheets.forEach(stylesheet => {
-
-				styleSheetPromises.push(new Promise(resolve => Utils.getCSS(stylesheet, resolve)));
-			});
-		}
-
-		Promise.all([
-			...styleSheetPromises,
-		]).then(stylesheets => {
-			document.adoptedStyleSheets = stylesheets;
-		});
-
-		if (!!config.providers) {
-			config.providers.forEach(provider => App.provide(...provider));
-		}
-
-		if (!!config.loggerConfig) {
-			if (!!config.loggerConfig.handler) {
-				App.loggerFactory.setEndpoint(config.loggerConfig.handler);
-			}
-			if (!!config.loggerConfig.level) {
-				App.loggerFactory.setLogLevel(config.loggerConfig.level);
-			}
+		if (config.staticRoot) {
+			App.staticRoot = config.staticRoot;
 		} else {
-			// Since it's expected that it's not referenced by anything else, we can expect GC will dispose of it.
-			App.loggerFactory = null;
+			App.staticRoot = '';
 		}
 
-		App.instance = this;
-		App.appReady = new Promise(resolve => {
-			// We must delay the initialization of the root components and router, as some modules used in this callback refer to the
-			// App.appReady promise.
-			setTimeout(() => {
-				if (!!config.rootComponents) {
-					config.rootComponents.forEach((component) => {
-						if (!customElements.get(component.tagName)) {
-							customElements.define(component.tagName, component);
+		if (config.rootStylesheets) {
+			config.rootStylesheets.forEach((stylesheet) => {
+				styleSheetPromises.push(new Promise(
+					(resolve) => {
+						utils.Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
+					}
+				));
+			});
+		}
+
+		Promise.all([...styleSheetPromises]).then((stylesheets) => {
+			document.adoptedStyleSheets = [...stylesheets];
+		});
+
+		if (config.httpEndpointStub) {
+			httpPromise = import('./http.js');
+
+			if (config.authenticationModule) {
+				authenticationPath = config.authenticationModule;
+			} else {
+				authenticationPath = './authentication.js';
+			}
+
+			authenticationPromise = import(authenticationPath);
+		}
+
+		if (config.loggerConfig) {
+			loggingPromise = import('./logging.js');
+		}
+
+		this.ready = new Promise((resolve) => {
+			Promise.all([authenticationPromise, httpPromise, loggingPromise]).then(
+				([authenticationModule, httpModule, loggingFactoryModule]) => {
+					if (Boolean(httpModule) && Boolean(httpModule.default)) {
+						if (!authenticationModule || !authenticationModule.default) {
+							throw new Error('Authentication failed to initialize');
 						}
-					});
-				}
 
-				this.router = new Router(
-					config.routeRoot,
-					config.homePage,
-					config.notFound,
-					config.routes,
-					config.authenticationUrl,
-				);
+						this.http = new httpModule.default(config.httpEndpointStub, new authenticationModule.default);
+					}
 
-				if (!!config.authenticationClass) {
-					authentication = new config.authenticationClass();
-				} else {
-					authentication = new Authentication();
-				}
+					if (Boolean(loggingFactoryModule) && Boolean(loggingFactoryModule.default)) {
+						App.loggerFactory = new loggingFactoryModule.default;
 
-				if (!!config.httpEndpointStub) {
-					this.http = new Http(config.httpEndpointStub, authentication);
-				}
+						if (config.loggerConfig.level) {
+							App.loggerFactory.setLogLevel(config.loggerConfig.level);
+						}
 
-				if (Array.isArray(config.onAppReady)) {
-					config.onAppReady.forEach(fn => fn(this));
-				}
+						if (config.loggerConfig.handler) {
+							App.loggerFactory.setEndpoint(config.loggerConfig.handler);
+						}
+					}
 
-				resolve(this);
-			});
+					this.router = new Router(
+						config.routeRoot,
+						config.homePage,
+						config.notFound,
+						config.routes,
+						config.authenticationUrl,
+					);
+
+					if (Array.isArray(config.onAppReady)) {
+						config.onAppReady.forEach((fn) => fn(this));
+					}
+
+					resolve();
+				},
+			);
 		});
 
-		return this;
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'App';
-	}
-
-	static provide(clazz, name, config) {
-		const key = clazz.name;
-
-		if (!App.injectionRegistry[key]) {
-			App.injectionRegistry[key] = [];
-		}
-		if (!!config.useFactory) {
-			App.injectionRegistry[key].push(function () {
-				return {
-					name,
-					entity: config.useFactory(...config.params),
-				};
-			});
-		} else if (!!config.useClass) {
-			App.injectionRegistry[key].push(function () {
-				return {
-					name,
-					entity: new config.useClass(...config.params),
-				};
-			});
-		}
-	}
-
-	static inject(clazz) {
-		let result = {};
-
-		if (!App.injectionRegistry[clazz.name]) {
-			return result;
-		}
-
-		App.injectionRegistry[clazz.name].forEach(injector => {
-			const injection = injector();
-			result = {
-				...result,
-				[injection.name]: injection.entity,
-			};
-		});
-
-		return result;
+		App.instance = this; // Remove after done testing
 	}
 }

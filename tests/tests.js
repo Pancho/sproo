@@ -1,58 +1,68 @@
-import { Mavor } from '../fiu/js/mavor.js';
-import { Manager } from './api/manager.js';
-import { DatabaseSuite } from './spec/database/database-suite.js';
-import { FiuAppSuite } from './spec/fiu-app/fiu-app-suite.js';
-import { FiuComponentSuite } from './spec/fiu-component/fiu-component-suite.js';
-import { MavorSuite } from './spec/mavor/mavor-suite.js';
-import { StateManagementSuite } from './spec/state-management/state-management-suite.js';
+import {Manager} from './api/manager.js';
+import {DatabaseSuite} from './spec/database/database-suite.js';
+import {FiuAppSuite} from './spec/fiu-app/fiu-app-suite.js';
+import {FiuComponentSuite} from './spec/fiu-component/fiu-component-suite.js';
 
 class Tests {
-	manager = new Manager();
+	manager = (new Manager);
 	nav = document.querySelector('nav');
 	main = document.querySelector('main');
+	testRunning = false;
 
 	constructor() {
-		this.manager.addSuite(new MavorSuite());
-		this.manager.addSuite(new DatabaseSuite());
-		this.manager.addSuite(new FiuAppSuite());
-		this.manager.addSuite(new FiuComponentSuite());
-		this.manager.addSuite(new StateManagementSuite());
+		this.manager.addSuite(new DatabaseSuite);
+		this.manager.addSuite(new FiuAppSuite);
+		this.manager.addSuite(new FiuComponentSuite);
 		this.initNavigation();
+	}
+
+	static createElement(string) {
+		const wrapper = document.createElement('div');
+
+		wrapper.innerHTML = string;
+
+		return wrapper.firstElementChild;
+	}
+
+	static stripHTMLTags(string) {
+		return string.replace(/<[^>]*>/gu, '');
 	}
 
 	initNavigation() {
 		Object.entries(this.manager.suites).forEach(([slug, suite]) => {
-			this.nav.append(Mavor.createElement(`<a href="#${slug}">${suite.name}</a>`));
+			this.nav.append(Tests.createElement(`<a href="#${ slug }">${ suite.name }</a>`));
 		});
-		this.nav.append(Mavor.createElement(`<a href="#all-tests">All Tests</a>`));
+		this.nav.append(Tests.createElement(`<a href="#all-tests">All Tests</a>`));
 
-		this.nav.addEventListener('click', ev => {
+		this.nav.addEventListener('click', (ev) => {
 			const target = ev.target.getAttribute('href');
+
 			if (ev.target.tagName.toLowerCase() !== 'a') {
 				return;
 			}
+
 			ev.preventDefault();
 			window.location.hash = target;
 			this.setupContent(target);
 		});
 
-		if (!!window.location.hash) {
+		if (window.location.hash) {
 			this.setupContent(window.location.hash);
 		}
 	}
 
 	removeExistingContent() {
-		document.querySelectorAll('.content').forEach(content => content.parentElement.removeChild(content));
+		this.main.querySelectorAll('.content').forEach((content) => content.parentElement.removeChild(content));
 	}
 
 	getNewContent(...suites) {
 		const allTests = suites.reduce((prev, next) => ({...prev, ...next.tests}), {}),
-			suiteNames = suites.map(suite => suite.name),
-			content = Mavor.createElement(`<div class="content">
-				<h2>${suiteNames.join(', ')}</h2>
+			suiteNames = suites.map((suite) => suite.name),
+			content = Tests.createElement(`<div class="content">
+				<h2>${ suiteNames.join(', ') }</h2>
 			</div>`),
-			control = Mavor.createElement(`<div class="control">
-				<p class="filter">Tests in suite: ${Object.keys(allTests).length}</p>
+			control = Tests.createElement(`<div class="control">
+				<p class="filter">Tests in suite: ${ Object.keys(allTests).length }</p>
 				<p class="result-count">
 					<span class="filter successful"></span>
 					<span class="filter failed"></span>
@@ -63,17 +73,16 @@ class Tests {
 				</div>
 				<a class="button run-suite">Run All Tests</a>
 			</div>`),
-			testList = Mavor.createElement(`<ol class="test-list"></ol>`);
-		let testRunning = false;
+			testList = Tests.createElement(`<ol class="test-list"></ol>`);
 
 		content.append(control);
 		content.append(testList);
 		this.main.append(content);
 
 		Object.entries(allTests).forEach(([slug, test]) => {
-			const listItem = Mavor.createElement(`<li class="test" id="${slug}">
+			const listItem = Tests.createElement(`<li class="test" id="${ slug }">
 					<div>
-						<h3>${test.name}</h3>
+						<h3>${ test.name }</h3>
 						<p class="result"></p>
 						<p class="report"></p>
 					</div>
@@ -82,15 +91,16 @@ class Tests {
 					</div>
 				</li>`);
 
-			listItem.querySelector('.run-test').addEventListener('click', ev => {
+			listItem.querySelector('.run-test').addEventListener('click', (ev) => {
 				const selectedTest = allTests[slug],
 					resultPlaceholder = ev.target.closest('li').querySelector('.result'),
 					reportPlaceholder = ev.target.closest('li').querySelector('.report');
 
 				selectedTest.run().then(() => {
 					reportPlaceholder.innerHTML = selectedTest.resultReport;
-					reportPlaceholder.setAttribute('title', Mavor.stripHTMLTags(selectedTest.resultReport));
+					reportPlaceholder.setAttribute('title', Tests.stripHTMLTags(selectedTest.resultReport));
 					resultPlaceholder.textContent = selectedTest.resultMessage;
+
 					if (selectedTest.succeeded) {
 						resultPlaceholder.classList.add('success');
 					} else if (selectedTest.failed) {
@@ -105,18 +115,25 @@ class Tests {
 			testList.append(listItem);
 		});
 
-		control.querySelector('.run-suite').addEventListener('click', ev => {
+		control.querySelector('.run-suite').addEventListener('click', (ev) => {
+			let percentage = 0,
+				successful = 0,
+				failed = 0,
+				exception = 0;
+
 			const listItems = testList.querySelectorAll('li'),
 				step = 100 / listItems.length,
 				renderItem = async (listItem) => {
-					if (!testRunning) {
-						testRunning = true;
-					} else {
+					if (this.testRunning) {
 						setTimeout(() => {
 							renderItem(listItem);
 						}, Math.random() * 100);
+
 						return;
 					}
+
+					this.testRunning = true;
+
 
 					const selectedTest = allTests[listItem.dataset.slug],
 						resultPlaceholder = listItem.querySelector('.result'),
@@ -125,6 +142,7 @@ class Tests {
 					await selectedTest.run();
 					reportPlaceholder.innerHTML = selectedTest.resultReport;
 					resultPlaceholder.textContent = selectedTest.resultMessage;
+
 					if (selectedTest.succeeded) {
 						resultPlaceholder.classList.add('success');
 						successful += 1;
@@ -135,25 +153,22 @@ class Tests {
 						resultPlaceholder.classList.add('exception');
 						exception += 1;
 					}
+
 					percentage += step;
-					control.querySelector('.progress .progress-bar').style.width = `${percentage.toFixed(8)}%`;
-					control.querySelector('.successful').textContent = `Successful: ${successful}`;
-					control.querySelector('.failed').textContent = `Failed: ${failed}`;
-					control.querySelector('.exception').textContent = `Exception: ${exception}`;
+					control.querySelector('.progress .progress-bar').style.width = `${ percentage.toFixed(8) }%`;
+					control.querySelector('.successful').textContent = `Successful: ${ successful }`;
+					control.querySelector('.failed').textContent = `Failed: ${ failed }`;
+					control.querySelector('.exception').textContent = `Exception: ${ exception }`;
 					control.querySelector('.result-count').style.display = 'block';
-					testRunning = false;
+					this.testRunning = false;
 				};
-			let percentage = 0,
-				successful = 0,
-				failed = 0,
-				exception = 0;
 
 			ev.preventDefault();
 			control.querySelector('.result-count').style.display = 'none';
 
 			testList.querySelectorAll('li').forEach(renderItem);
 		});
-		control.querySelectorAll('.filter').forEach(filter => filter.addEventListener('click', ev => {
+		control.querySelectorAll('.filter').forEach((filter) => filter.addEventListener('click', (ev) => {
 			const target = ev.target,
 				listItems = content.querySelectorAll('.test');
 			let elements = content.querySelectorAll('.result');
@@ -166,13 +181,18 @@ class Tests {
 				elements = content.querySelectorAll('.result.exception');
 			}
 
-			listItems.forEach(elm => elm.style.display = 'none');
-			elements.forEach(elm => elm.closest('.test').style.display = 'flex');
+			listItems.forEach((elm) => {
+				elm.style.display = 'none';
+			});
+			elements.forEach((elm) => {
+				elm.closest('.test').style.display = 'flex';
+			});
 		}));
 	}
 
 	setupContent(hash) {
 		this.removeExistingContent();
+
 		if (hash === '#all-tests') {
 			this.getNewContent(...Object.values(this.manager.suites));
 		} else {
@@ -181,4 +201,4 @@ class Tests {
 	}
 }
 
-new Tests();
+new Tests;

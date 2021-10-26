@@ -1,6 +1,6 @@
-import { tap } from '../../../fiu/js/reactive/operators.js';
-import { Persistence, Store } from '../../../fiu/js/state-management.js';
-import { Test } from '../../api/test.js';
+import {tap} from '../../../fiu/js/reactive/operators.js';
+import {Persistence, Store} from '../../../fiu/js/state-management.js';
+import {Test} from '../../api/test.js';
 
 export class StateManagementSetupTest extends Test {
 	constructor() {
@@ -9,6 +9,7 @@ export class StateManagementSetupTest extends Test {
 
 	async test() {
 		const store = Store.get('StateManagementSetupTest');
+
 		await this.assertTruthy(store);
 	}
 }
@@ -20,34 +21,34 @@ export class StateManagementDispatchTest extends Test {
 		super('State Management Dispatch Test', 'Dispatch processed successfully', 'Dispatch failed to process');
 	}
 
-	async setup() {
+	setup() {
 		this.store = Store.get('StateManagementSetupTest');
 	}
 
 	async test() {
+		let subscription = null;
+		const result = await new Promise((resolve) => {
+				subscription = this.store.select('test/value').pipe(
+					tap((storeResult) => {
+						resolve(storeResult);
+					}),
+				).subscribe();
+			}),
+			randomValue = Math.round(Math.random() * 1000 * 1000);
+
 		this.store.dispatch(new class TestAction {
 			slice = 'test/value';
 
-			constructor() {
-			}
-
 			reducer(currentState) {
-				currentState.value = 1234567890;
+				currentState.value = randomValue;
 			}
-		}());
-		let subscription;
-		const result = await new Promise(resolve => {
-			subscription = this.store.select('test/value').pipe(
-				tap(storeResult => {
-					resolve(storeResult);
-				}),
-			).subscribe();
 		});
+
 		subscription.unsubscribe();
-		await this.assertEquals(result, 1234567890);
+		await this.assertEquals(result, randomValue);
 	}
 
-	async teardown() {
+	teardown() {
 		this.store.clearStore();
 	}
 }
@@ -56,10 +57,14 @@ export class StateManagementPersistenceLocalStorageTest extends Test {
 	store;
 
 	constructor() {
-		super('State Management Persistence Local Storage Test', 'Persistence to localStorage processed successfully', 'Persistence to localStorage failed to process');
+		super(
+			'State Management Persistence Local Storage Test',
+			'Persistence to localStorage processed successfully',
+			'Persistence to localStorage failed to process',
+		);
 	}
 
-	async setup() {
+	setup() {
 		this.store = Store.get('StateManagementPersistenceLocalStorageTest', new class LocalStoragePersistence extends Persistence {
 			getItem(key) {
 				return JSON.parse(localStorage.getItem(key));
@@ -68,22 +73,29 @@ export class StateManagementPersistenceLocalStorageTest extends Test {
 			setItem(key, object) {
 				localStorage.setItem(key, JSON.stringify(object));
 			}
-		}());
+		});
 	}
 
-	async test() {
+	test() {
 		const number = Math.random();
+
 		this.store.dispatch(new class TestAction {
 			slice = 'test/value';
 
 			reducer(currentState) {
 				currentState.value = number;
 			}
-		}());
-		await this.assertEquals(JSON.stringify(JSON.parse(localStorage.getItem('fiu/store'))['StateManagementPersistenceLocalStorageTest']), `{"test":{"value":${number}}}`);
+		});
+		this.assertEquals(
+			JSON.stringify(
+				JSON.parse(
+					localStorage.getItem('fiu/store'),
+				)['StateManagementPersistenceLocalStorageTest']),
+			`{"test":{"value":${ number }}}`,
+		);
 	}
 
-	async teardown() {
+	teardown() {
 		this.store.clearStore();
 		localStorage.removeItem(Store.STORE_KEY);
 	}

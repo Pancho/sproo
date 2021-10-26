@@ -1,0 +1,67 @@
+Components:
+* notification bar
+    * background color
+    * timeouts
+    * close actions
+* avatar?
+    * image
+* dialog
+    * fullscreen
+    * lightbox
+    * top/right/bottom/left
+* button?
+* carousel
+* chip (a small div with some text or icons or whatever)
+* lists
+    * expanding
+* forms
+    * field error messages
+    * form error messages
+    * text
+    * hidden
+    * checkboxes
+    * radios
+    * file input
+    * select
+        * multiple
+    * textarea
+    * date
+    * datetime
+    * tel
+    * email
+    * url
+    * number
+    * password
+    * reset
+    * submit
+* pagination?
+* datepicker
+* progress bar
+* tables
+     * search
+     * sort
+* tabs
+* tooltips
+
+
+Charts:
+Bugs
+
+* Need to implement the tooltip in a reasonable lazy-loading way, so it doesn't need to be a part of the config; some
+nice default + way to customize the hell out of it.
+
+Attributes
+Height & width
+Config setter & rerender
+Data setter & rerender
+
+Missing charts:
+* Geo chart (where to get the map(s)?)
+* Scatter chart
+* Histogram
+* Bar chart
+* Candlesticks
+* Line chart & area chart
+* Pie & donut chart
+* Gauge
+* Timeline ?

@@ -1,69 +1,23 @@
-/**
- * Logging levels
- *
- */
-export class LogLevels {
-
-	/**
-	 * Log all, raise an error if mismatch amount of arguments
-	 */
-	static LOG_RAISE_ERROR = 1;
-
-	/**
-	 * Log all, print a warning when mismatch amount of arguments
-	 */
-	static LOG_WITH_WARNINGS = 2;
-
-	/**
-	 * Log all
-	 */
-	static TRACE = 3;
-
-	/**
-	 * Hide: trace
-	 * Print: debug, info, warn, error
-	 */
-	static DEBUG = 4;
-	/**
-	 * Print: info, warn, error
-	 * Hide: trace, debug
-	 */
-	static LOG = 5;
-	/**
-	 * Print: warn, error
-	 * Hide: trace, debug, info
-	 */
-	static WARN = 6;
-	/**
-	 * Print: error
-	 * Hide: trace, debug, info, warn
-	 */
-	static ERROR = 7;
-	/**
-	 * Completely disable all logging functions
-	 */
-	static DISABLE_LOGS = 8;
-}
+const LEVELS = [
+		'with-warnings',
+		'trace',
+		'debug',
+		'log',
+		'warn',
+		'error',
+	],
+	WHITE = 0x00FFFFFF;
 
 /**
  * Factory class for {@see Logger}
  */
-export class LoggerFactory {
+export default class LoggerFactory {
+	[Symbol.toStringTag] = 'LoggerFactory';
 	/**
 	 * Current logging level
 	 */
-	logLevel = LogLevels.LOG_WITH_WARNINGS;
+	logLevel = 'with-warnings';
 	worker;
-
-	constructor() {
-	}
-
-	get [Symbol.toStringTag]() {
-		return 'LoggerFactory';
-	}
-
-	noop() {
-	}
 
 	/**
 	 * @return Single log function that can be called, e.g. getSingleLogger(...)('hello world')
@@ -72,19 +26,23 @@ export class LoggerFactory {
 	 * @param fn - bound function that will be called eventually, e.g. console.log
 	 * @param minLevel - initial logging level, .e.g 2
 	 */
-	getSingleLogger(initiator, style, fn, minLevel = LogLevels.LOG_WITH_WARNINGS) {
+	getSingleLogger(initiator, style, fn, minLevel = 'with-warnings') {
 		return (...outerArgs) => {
 			if (this.logLevel > minLevel) {
-				return this.noop;
+				return () => {
+				};
 			}
-			const params = [console, `%c${initiator}`, style, ...outerArgs];
-			if (!!this.worker) {
+
+			const params = [console, `%c${ initiator }`, style, ...outerArgs];
+
+			if (this.worker) {
 				this.worker.postMessage({
 					source: initiator,
 					arguments: JSON.stringify(outerArgs),
 					level: fn.name,
 				});
 			}
+
 			return Function.prototype.bind.apply(fn, params);
 		};
 	}
@@ -95,17 +53,18 @@ export class LoggerFactory {
 	 */
 	getLogger(clazz) {
 		const style = LoggerFactory.getColorStyle(LoggerFactory.classToColor(clazz));
+
 		return {
 			trace: this.getSingleLogger(
-				clazz.name, style, console.trace, LogLevels.TRACE),
+				clazz.name, style, console.trace, 'trace'),
 			debug: this.getSingleLogger(
-				clazz.name, style, console.debug, LogLevels.DEBUG),
+				clazz.name, style, console.debug, 'debug'),
 			log: this.getSingleLogger(
-				clazz.name, style, console.log, LogLevels.LOG),
+				clazz.name, style, console.log, 'log'),
 			warn: this.getSingleLogger(
-				clazz.name, style, console.warn, LogLevels.WARN),
+				clazz.name, style, console.warn, 'warn'),
 			error: this.getSingleLogger(
-				clazz.name, style, console.error, LogLevels.ERROR),
+				clazz.name, style, console.error, 'error'),
 		};
 	}
 
@@ -118,9 +77,10 @@ export class LoggerFactory {
 	}
 
 	setLogLevel(logLevel) {
-		if (LogLevels.LOG_RAISE_ERROR > logLevel || logLevel > LogLevels.DISABLE_LOGS) {
-			throw Error(`Invalid log level ${logLevel} allowed:  ${JSON.stringify(LogLevels)}`);
+		if (!LEVELS.includes(logLevel)) {
+			throw Error(`Invalid log level ${ logLevel },  allowed levels:  ${ JSON.stringify(LEVELS) }`);
 		}
+
 		this.logLevel = logLevel;
 	}
 
@@ -130,18 +90,20 @@ export class LoggerFactory {
 	 */
 	static getColorStyle(color) {
 		return `color: white; background-color: ${
-			color}; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
+			color }; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
 	}
 
 	static classToColor(clazz) {
-		let hash = 0;
-		let i = 0;
+		let color = '#FFFFFF',
+			hash = 0,
+			i = 0;
 		const len = clazz.name.length;
+
 		for (; i < len; i += 1) {
 			hash = clazz.name.charCodeAt(i) + ((hash << 5) - hash);
 		}
 
-		const color = (hash & 0x00FFFFFF)
+		color = (hash & WHITE)
 			.toString(16)
 			.toUpperCase();
 
@@ -149,6 +111,6 @@ export class LoggerFactory {
 	}
 
 	static createWorker(fn) {
-		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${fn}`])));
+		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${ fn }`])));
 	}
 }

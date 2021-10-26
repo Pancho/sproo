@@ -1,7 +1,12 @@
+/* Disclaimer: These are google's colors, not my picks. Material design has a nice palette. */
+
 /******************/
 /* COLORS CLASSES */
 /******************/
-/* Use these color classes like you would use any other class in your HTML */
+/* Use these color classes like you would use any other class in your HTML.
+But be smart, and don't load the whole file for every page or, satan forbid,
+every component. Load it development time, no problem, nobody cares then,
+but when you're satisfied, just copy whatever you used to your component's file. */
 
 /********************/
 /* Greyscale Colors */
