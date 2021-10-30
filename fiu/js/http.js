@@ -23,6 +23,21 @@ export default class Http {
 		this.authentication = authentication;
 	}
 
+	constructUrl(path, params) {
+		const localPath = path.startsWith('/') ? path.slice(1) : path;
+		let queryString = '';
+
+		if (params) {
+			queryString = Object.entries(params).map((entry) => `${ entry[0] }=${ ''.join(entry[1]) }`).join('&');
+		}
+
+		if (queryString.length > 0) {
+			return `${ this.httpEndpointStub }/${ localPath }?${ queryString }`;
+		}
+
+		return `${ this.httpEndpointStub }/${ localPath }`;
+	}
+
 	// MDN: The GET method requests a representation of the specified resource. Requests using GET should only retrieve data.
 	async get(path, params, httpHeaders, authenticate = true) {
 		const headers = {
@@ -33,7 +48,7 @@ export default class Http {
 				method: 'GET',
 				headers: headers,
 			},
-			url = Http.constructUrl(path, params);
+			url = this.constructUrl(path, params);
 
 		return await this.fetch(url, options, authenticate);
 	}
@@ -48,7 +63,7 @@ export default class Http {
 				method: 'HEAD',
 				headers: headers,
 			},
-			url = Http.constructUrl(path, params);
+			url = this.constructUrl(path, params);
 
 		return await this.fetch(url, options, authenticate);
 	}
@@ -63,7 +78,7 @@ export default class Http {
 				method: 'DELETE',
 				headers: headers,
 			},
-			url = Http.constructUrl(path, params);
+			url = this.constructUrl(path, params);
 
 		return await this.fetch(url, options, authenticate);
 	}
@@ -78,7 +93,7 @@ export default class Http {
 				method: 'OPTIONS',
 				headers: headers,
 			},
-			url = Http.constructUrl(path, params);
+			url = this.constructUrl(path, params);
 
 		return await this.fetch(url, options, authenticate);
 	}
@@ -97,7 +112,7 @@ export default class Http {
 				body: body,
 				...fetchOptions,
 			},
-			url = Http.constructUrl(path);
+			url = this.constructUrl(path);
 
 		return await this.fetch(url, options, authenticate);
 	}
@@ -114,7 +129,7 @@ export default class Http {
 				body: body,
 				...fetchOptions,
 			},
-			url = Http.constructUrl(path);
+			url = this.constructUrl(path);
 
 		return await this.fetch(url, options, authenticate);
 	}
@@ -125,20 +140,5 @@ export default class Http {
 		}
 
 		return await window.fetch(url, options);
-	}
-
-	static constructUrl(path, params) {
-		const localPath = path.startsWith('/') ? path.slice(1) : path;
-		let queryString = '';
-
-		if (params) {
-			queryString = Object.entries(params).map((entry) => `${ entry[0] }=${ ''.join(entry[1]) }`).join('&');
-		}
-
-		if (queryString.length > 0) {
-			return `${ this.httpEndpointStub }/${ localPath }?${ queryString }`;
-		}
-
-		return `${ this.httpEndpointStub }/${ localPath }`;
 	}
 }
