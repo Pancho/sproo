@@ -441,27 +441,6 @@ export default class Component extends HTMLElement {
 		});
 	}
 
-	static parseIf(owner, templateDocument) {
-		let refElement = null;
-
-		while (refElement = templateDocument.querySelector('[if]')) {
-			const attributeValue = refElement.getAttribute('if');
-			if (!owner.ifIndex[attributeValue]) {
-				owner.ifIndex[attributeValue] = [];
-			}
-
-			const clone = document.importNode(refElement, true),
-				ifElement = document.createElement('fiu-if');
-
-			refElement.parentElement.insertBefore(ifElement, refElement);
-			refElement.parentElement.removeChild(refElement);
-			owner.ifIndex[attributeValue].push({
-				elm: clone,
-				ifElement: ifElement,
-			});
-		}
-	}
-
 	static parseForEach(owner, templateDocument) {
 		let refElement = null;
 
@@ -523,6 +502,55 @@ export default class Component extends HTMLElement {
 		});
 	}
 
+	static parseIf(owner, templateDocument) {
+		let refElement = null;
+
+		while (refElement = templateDocument.querySelector('[if]')) {
+			const attributeValue = refElement.getAttribute('if');
+			if (!owner.ifIndex[attributeValue]) {
+				owner.ifIndex[attributeValue] = [];
+			}
+
+			const clone = document.importNode(refElement, true),
+				ifElement = document.createElement('fiu-if');
+
+			refElement.parentElement.insertBefore(ifElement, refElement);
+			refElement.parentElement.removeChild(refElement);
+			owner.ifIndex[attributeValue].push({
+				elm: clone,
+				ifElement: ifElement,
+			});
+		}
+	}
+
+	static processIf(root, owner, key, value, inheritedContext) {
+		owner.ifIndex[key].forEach((entry) => {
+			const elm = entry.elm,
+				ifElement = entry.ifElement;
+
+			if (value) {
+				if (!elm.parentElement) {
+					// We'll just clean the removed if element form the index, as it will get recreated if needed again.
+					owner.ifIndex[key] = utils.uniqBy(owner.ifIndex[key], item => item.ifElement);
+
+					if (elm.querySelectorAll('[if]').length > 0) {
+						Component.processTemplate(root, owner, elm);
+						Component.setContext(root, owner, elm, {
+							...inheritedContext,
+						});
+					}
+					if (ifElement.parentElement) {
+						ifElement.parentElement.insertBefore(elm, ifElement);
+						ifElement.parentElement.removeChild(ifElement);
+					}
+				}
+			} else if (elm.parentElement) {
+				elm.parentElement.insertBefore(ifElement, elm);
+				elm.parentElement.removeChild(elm);
+			}
+		});
+	}
+
 	static setContext(root, owner, templateDocument, change) {
 		if (!Component.isObject(change)) {
 			throw Error(`Context has to be updated with an object. Got ${ change }`);
@@ -542,20 +570,7 @@ export default class Component extends HTMLElement {
 					const extractedValue = selectorKey.split('.').slice(1).reduce((previous, current) => previous[current], value);
 
 					owner.ifIndex[selectorKey].forEach((entry) => {
-						const elm = entry.elm,
-							ifElement = entry.ifElement;
-
-						if (extractedValue) {
-							if (!elm.parentElement) {
-								// We'll just clean the removed if element form the index, as it will get recreated if needed again.
-								owner.ifIndex[selectorKey] = utils.uniqBy(owner.ifIndex[selectorKey], item => item.ifElement)
-								ifElement.parentElement.insertBefore(elm, ifElement);
-								ifElement.parentElement.removeChild(ifElement);
-							}
-						} else if (elm.parentElement) {
-							elm.parentElement.insertBefore(ifElement, elm);
-							elm.parentElement.removeChild(elm);
-						}
+						Component.processIf(root, owner, selectorKey, extractedValue, owner.templateContext);
 					});
 				}
 

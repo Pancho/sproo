@@ -28,23 +28,23 @@ export default class DemoPageComponent extends Component {
 	// 		date: '03.01.2021',
 	// 	},
 	// ];
-	outerScopeText = '/////////////////';
-	nested = [
-		{
-			name: 'First',
-			children: [
-				{
-					name: 'Child of first 1',
-					other: 'Child of first other 1',
-					booleanValue: false,
-				},
-				{
-					name: 'Child of first 2',
-					other: 'Child of first other 2',
-					booleanValue: false,
-				},
-			],
-		},
+	// outerScopeText = '/////////////////';
+	// nested = [
+	// 	{
+	// 		name: 'First',
+	// 		children: [
+	// 			{
+	// 				name: 'Child of first 1',
+	// 				other: 'Child of first other 1',
+	// 				booleanValue: false,
+	// 			},
+	// 			{
+	// 				name: 'Child of first 2',
+	// 				other: 'Child of first other 2',
+	// 				booleanValue: false,
+	// 			},
+	// 		],
+	// 	},
 		// {
 		// 	name: 'Second',
 		// 	children: [
@@ -58,21 +58,21 @@ export default class DemoPageComponent extends Component {
 		// 		},
 		// 	],
 		// },
-	];
-	dictFor = {
-		name: 'Name',
-		lastName: 'Lastname',
-		prop1: 'Prop 1',
-		prop2: 'Prop 2',
-		prop3: 'Prop 3',
-	}
-	valuesUpdated = false;
+	// ];
+	// dictFor = {
+	// 	name: 'Name',
+	// 	lastName: 'Lastname',
+	// 	prop1: 'Prop 1',
+	// 	prop2: 'Prop 2',
+	// 	prop3: 'Prop 3',
+	// }
+	// valuesUpdated = false;
 	booleanValue = true;
 	blah = '(0, 0)';
-	coords = {
-		x: 0,
-		y: 0,
-	};
+	// coords = {
+	// 	x: 0,
+	// 	y: 0,
+	// };
 
 	onTemplateLoaded() {
 		setInterval(_ => {
