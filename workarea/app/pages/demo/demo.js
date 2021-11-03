@@ -11,68 +11,68 @@ export default class DemoPageComponent extends Component {
 	];
 	static registerComponents = ['/app/components/child-component/child-component.js'];
 	paragraphContainer;
-	// testList = [
-	// 	{
-	// 		title: 'Test Title 1',
-	// 		text: 'Lorem ipsum dolor sit amet 1',
-	// 		date: '01.01.2021',
-	// 	},
-	// 	{
-	// 		title: 'Test Title 2',
-	// 		text: 'Lorem ipsum dolor sit amet 2',
-	// 		date: '02.01.2021',
-	// 	},
-	// 	{
-	// 		title: 'Test Title 3',
-	// 		text: 'Lorem ipsum dolor sit amet 3',
-	// 		date: '03.01.2021',
-	// 	},
-	// ];
-	// outerScopeText = '/////////////////';
-	// nested = [
-	// 	{
-	// 		name: 'First',
-	// 		children: [
-	// 			{
-	// 				name: 'Child of first 1',
-	// 				other: 'Child of first other 1',
-	// 				booleanValue: false,
-	// 			},
-	// 			{
-	// 				name: 'Child of first 2',
-	// 				other: 'Child of first other 2',
-	// 				booleanValue: false,
-	// 			},
-	// 		],
-	// 	},
-		// {
-		// 	name: 'Second',
-		// 	children: [
-		// 		{
-		// 			name: 'Child of second 1',
-		// 			other: 'Child of second other 1',
-		// 		},
-		// 		{
-		// 			name: 'Child of second 2',
-		// 			other: 'Child of second other 2',
-		// 		},
-		// 	],
-		// },
-	// ];
-	// dictFor = {
-	// 	name: 'Name',
-	// 	lastName: 'Lastname',
-	// 	prop1: 'Prop 1',
-	// 	prop2: 'Prop 2',
-	// 	prop3: 'Prop 3',
-	// }
-	// valuesUpdated = false;
+	testList = [
+		{
+			title: 'Test Title 1',
+			text: 'Lorem ipsum dolor sit amet 1',
+			date: '01.01.2021',
+		},
+		{
+			title: 'Test Title 2',
+			text: 'Lorem ipsum dolor sit amet 2',
+			date: '02.01.2021',
+		},
+		{
+			title: 'Test Title 3',
+			text: 'Lorem ipsum dolor sit amet 3',
+			date: '03.01.2021',
+		},
+	];
+	outerScopeText = '/////////////////';
+	nested = [
+		{
+			name: 'First',
+			children: [
+				{
+					name: 'Child of first 1',
+					other: 'Child of first other 1',
+					booleanValue: false,
+				},
+				{
+					name: 'Child of first 2',
+					other: 'Child of first other 2',
+					booleanValue: false,
+				},
+			],
+		},
+		{
+			name: 'Second',
+			children: [
+				{
+					name: 'Child of second 1',
+					other: 'Child of second other 1',
+				},
+				{
+					name: 'Child of second 2',
+					other: 'Child of second other 2',
+				},
+			],
+		},
+	];
+	dictFor = {
+		name: 'Name',
+		lastName: 'Lastname',
+		prop1: 'Prop 1',
+		prop2: 'Prop 2',
+		prop3: 'Prop 3',
+	}
+	valuesUpdated = false;
 	booleanValue = true;
 	blah = '(0, 0)';
-	// coords = {
-	// 	x: 0,
-	// 	y: 0,
-	// };
+	coords = {
+		x: 0,
+		y: 0,
+	};
 
 	onTemplateLoaded() {
 		setInterval(_ => {

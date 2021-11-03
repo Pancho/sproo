@@ -9,7 +9,7 @@ import {slugify, kebabToCamel, toCamelCase, snakeToCamel, camelToKebab} from './
 import uuid from './uuid.js';
 
 export default {
-	uniqBy: uniqueBy,
+	uniqueBy: uniqueBy,
 	CssStatic,
 	debounce,
 	DeepProxy,

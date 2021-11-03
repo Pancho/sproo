@@ -1,5 +1,4 @@
 import App from './app.js';
-import {uniqueBy} from './utils/array.js';
 import utils from './utils/index.js';
 
 /* I wanted to have this "middleman", due to JS not supporting real decorators yet, to avoid boilerplate in the actual
@@ -391,13 +390,18 @@ export default class Component extends HTMLElement {
 
 	static processTemplate(root, owner, templateDocument) {
 		Component.parseFiuAttributes(root, owner, templateDocument);
-		Component.parseForEach(owner, templateDocument);
 		Component.parseIf(owner, templateDocument);
+		Component.parseForEach(owner, templateDocument);
 	}
 
 	static parseFiuAttributes(root, owner, templateDocument) {
 		templateDocument.querySelectorAll('*').forEach((refElement) => {
 			const attributeNames = refElement.getAttributeNames();
+			if (refElement.eventListeners) {
+				Object.entries(refElement.eventListeners).forEach(([event, listener]) => {
+					refElement.removeEventListener(event, listener);
+				});
+			}
 
 			if (attributeNames.length > 0) {
 				attributeNames.forEach((attributeName) => {
@@ -409,17 +413,21 @@ export default class Component extends HTMLElement {
 						const eventName = attributeName.replace('(', '').replace(')', '').trim();
 
 						if (typeof root[attributeValue] === 'function') {
-							if (refElement.closest('[for-each-data]')) {
-								refElement.addEventListener(eventName, (ev) => {
-									const fiuData = ev.target.closest('[for-each-data]').fiu;
-
-									root[attributeValue](ev, fiuData.for.data, fiuData.for.index);
-								});
-							} else {
-								refElement.addEventListener(eventName, (ev) => {
-									root[attributeValue](ev);
-								});
+							if (!refElement.eventListeners) {
+								refElement.eventListeners = {};
 							}
+
+							if (refElement.closest('[for-each-data]')) {
+								refElement.eventListeners[eventName] = (ev) => {
+									const fiuData = ev.target.closest('[for-each-data]').fiu;
+									root[attributeValue](ev, fiuData.for.data, fiuData.for.index);
+								}
+							} else {
+								refElement.eventListeners[eventName] = (ev) => {
+									root[attributeValue](ev);
+								};
+							}
+							refElement.addEventListener(eventName, refElement.eventListeners[eventName]);
 						} else {
 							console.warn(`Handler ${ attributeValue } not present on component`);
 						}
@@ -531,11 +539,11 @@ export default class Component extends HTMLElement {
 			if (value) {
 				if (!elm.parentElement) {
 					// We'll just clean the removed if element form the index, as it will get recreated if needed again.
-					owner.ifIndex[key] = utils.uniqBy(owner.ifIndex[key], item => item.ifElement);
+					owner.ifIndex[key] = utils.uniqueBy(owner.ifIndex[key], item => item.ifElement);
 
+					Component.processTemplate(root, root, elm);
 					if (elm.querySelectorAll('[if]').length > 0) {
-						Component.processTemplate(root, owner, elm);
-						Component.setContext(root, owner, elm, {
+						Component.setContext(root, root, elm, {
 							...inheritedContext,
 						});
 					}
