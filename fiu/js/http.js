@@ -19,7 +19,8 @@ export default class Http {
 
 		Http.instance = this;
 
-		this.httpEndpointStub = httpEndpointStub.endsWith('/') ? httpEndpointStub.slice(0, -1) : httpEndpointStub;
+		const cleanedStub = httpEndpointStub.endsWith('/') ? httpEndpointStub.slice(0, -1) : httpEndpointStub;
+		this.httpEndpointStub = `${window.location.protocol}//${window.location.host}${cleanedStub}`;
 		this.authentication = authentication;
 	}
 

@@ -81,7 +81,7 @@ export default class Router {
 
 		Router.instance = this;
 
-		this.routeRoot = routeRoot;
+		this.routeRoot = `${window.location.protocol}//${window.location.host}${routeRoot}`;
 		this.authenticationUrl = authenticationUrl;
 
 		window.addEventListener('popstate', (state) => this.resolve(state.target.location.href));
