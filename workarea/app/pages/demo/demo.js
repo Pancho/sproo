@@ -69,6 +69,8 @@ export default class DemoPageComponent extends Component {
 	valuesUpdated = false;
 	booleanValue = true;
 	blah = '(0, 0)';
+	blah2 = '(0, 0)';
+	blah3 = {};
 	coords = {
 		x: 0,
 		y: 0,
@@ -135,6 +137,9 @@ export default class DemoPageComponent extends Component {
 		this.booleanValue = !this.booleanValue;
 		this.nested[0].children[0].booleanValue = !this.nested[0].children[0].booleanValue;
 		this.blah = `(${ ev.screenX }, ${ ev.screenY })`;
+		this.blah2 = `(${ ev.screenX }, ${ ev.screenY })`;
+		this.blah3.key = ev.screenX;
+		this.blah3.value = ev.screenY;
 		this.coords = {
 			x: ev.screenX,
 			y: ev.screenY,

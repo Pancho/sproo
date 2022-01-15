@@ -4,8 +4,8 @@ import BazaComponent from '../baza-component.js';
 const html = new utils.HtmlStatic(`<table>
 	<thead fiu-ref="thead"></thead>
 	<tbody fiu-ref="tbody">
-		<tr for-each="row in internalData">
-			<td for-each="item in row"><span [text-content]="item"></span></td>
+		<tr for-each="row in internalData" for-key="0">
+			<td for-each="column in row">{{ column }}</td>
 		</tr>
 	</tbody>
 	<tfoot fiu-ref="tfoot"></tfoot>

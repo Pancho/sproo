@@ -2,7 +2,7 @@ import App from '../fiu/js/app.js';
 
 
 new App({
-	routeRoot: 'http://localhost',
+	routeRoot: '',
 	staticRoot: '',
 	homePage: {component: '/app/pages/demo/demo.js'},
 	notFound: {component: '/app/pages/not-found/not-found.js'},
@@ -45,7 +45,7 @@ new App({
 		'/fiu/css/normalize',
 	],
 	authenticationModule: null,
-	httpEndpointStub: 'http://localhost',
+	httpEndpointStub: '',
 	onAppReady: [],
 	loggerConfig: {level: 'trace'},
 });

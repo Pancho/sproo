@@ -152,7 +152,7 @@ import utils from './utils/index.js';
 
 const CLEAN_TRAILING_SLASH = /\/+$/u,
 	CLEAN_LEADING_SLASH = /^\/+/u,
-	PROPERTY_NAMES_MAP = {'text-content': 'textContent'};
+	TEXT_NODE_TAGS = /({{.+?}})/g;
 
 
 export default class Component extends HTMLElement {
@@ -389,12 +389,17 @@ export default class Component extends HTMLElement {
 	}
 
 	static processTemplate(root, owner, templateDocument) {
+		// console.time(`Process Template ${ templateDocument }`);
 		Component.parseFiuAttributes(root, owner, templateDocument);
 		Component.parseIf(owner, templateDocument);
-		Component.parseForEach(owner, templateDocument);
+		Component.parseForEach(root, owner, templateDocument);
+		// console.timeEnd(`Process Template ${ templateDocument }`);
 	}
 
 	static parseFiuAttributes(root, owner, templateDocument) {
+		const iter = document.createNodeIterator(templateDocument, NodeFilter.SHOW_TEXT);
+		let textNode;
+
 		templateDocument.querySelectorAll('*').forEach((refElement) => {
 			const attributeNames = refElement.getAttributeNames();
 			if (refElement.eventListeners) {
@@ -420,8 +425,8 @@ export default class Component extends HTMLElement {
 							if (refElement.closest('[for-each-data]')) {
 								refElement.eventListeners[eventName] = (ev) => {
 									const fiuData = ev.target.closest('[for-each-data]').fiu;
-									root[attributeValue](ev, fiuData.for.data, fiuData.for.index);
-								}
+									root[attributeValue](ev, fiuData);
+								};
 							} else {
 								refElement.eventListeners[eventName] = (ev) => {
 									root[attributeValue](ev);
@@ -447,9 +452,34 @@ export default class Component extends HTMLElement {
 				});
 			}
 		});
+
+		while (textNode = iter.nextNode()) {
+			const parent = textNode.parentNode;
+			if (textNode.textContent.includes('{{') && !parent.closest('[for-each],[if]')) {
+				const nodes = [];
+				textNode.textContent.split(TEXT_NODE_TAGS).filter(Boolean).forEach((part) => {
+					if (part.startsWith('{{') && part.endsWith('}}')) {
+						const partCleaned = part.replace('{{', '').replace('}}', '').trim(),
+							newNode = document.createTextNode('');
+
+						if (!owner.bindingIndex[partCleaned]) {
+							owner.bindingIndex[partCleaned] = [];
+						}
+
+						owner.bindingIndex[partCleaned].push(newNode);
+						nodes.push(newNode);
+					} else {
+						nodes.push(document.createTextNode(part));
+					}
+				});
+
+				textNode.after(...nodes);
+				parent.removeChild(textNode);
+			}
+		}
 	}
 
-	static parseForEach(owner, templateDocument) {
+	static parseForEach(root, owner, templateDocument) {
 		let refElement = null;
 
 		while (refElement = templateDocument.querySelector('[for-each]')) {
@@ -457,7 +487,8 @@ export default class Component extends HTMLElement {
 				forElement = document.createElement('fiu-for-each'),
 				split = refElement.getAttribute('for-each').split(' in '),
 				itemName = split[0].trim(),
-				itemsName = split[1].trim();
+				itemsName = split[1].trim(),
+				keyIdentifier = refElement.getAttribute('for-key');
 
 			if (!owner.forEachIndex[itemsName]) {
 				owner.forEachIndex[itemsName] = [];
@@ -465,48 +496,143 @@ export default class Component extends HTMLElement {
 
 			refElement.parentElement.insertBefore(forElement, refElement);
 			refElement.parentElement.removeChild(refElement);
+
+
+			template.removeAttribute('for-each');
+			template.setAttribute('for-each-data', '');
+
 			owner.forEachIndex[itemsName].push({
 				template: template,
 				forElement: forElement,
 				itemName: itemName,
+				keyIdentifier: keyIdentifier,
+				previousKeys: [],
+				keyElementMapping: new Map(),  // We'll use map here, so we keep element order, so we can use document fragment to reduce repaints when reacting to changes
 			});
 		}
 	}
 
-	static processForEach(root, owner, key, value, inheritedContext) {
-		owner.forEachIndex[key].forEach((entry) => {
+	/*
+	I'm borrowing optimization from alpinejs
+	 */
+	static processForEach(root, owner, forKey, items, inheritedContext) {
+		owner.forEachIndex[forKey].forEach((entry) => {
 			const forElement = entry.forElement,
 				itemName = entry.itemName,
-				parent = forElement.parentElement;
+				parent = forElement.parentElement,
+				keyIdentifier = entry.keyIdentifier,
+				documentFragment = document.createDocumentFragment(),
+				endingAnchor = document.createElement('for-each-ending-anchor');
+			let previousKeys = entry.previousKeys;
 
-			while (forElement.previousElementSibling) {
-				parent.removeChild(forElement.previousElementSibling);
-			}
+			if (Boolean(keyIdentifier)) {
+				const keys = items.map(item => keyIdentifier.split('.').reduce((previous, current) => previous[current], item)),
+					adds = [],
+					moves = [],
+					removes = [],
+					clonedKeyElementMapping = new Map();
+				let lastKey = false;
 
-			value.forEach((item, index) => {
-				const template = document.importNode(entry.template, true);
+				while (forElement.previousElementSibling) {
+					const clone = document.importNode(forElement.previousElementSibling, true);
+					clone.fiu = forElement.previousElementSibling.fiu;
+					documentFragment.prepend(clone);
+					clonedKeyElementMapping.set(
+						keyIdentifier.split('.').reduce((previous, current) => previous[current], clone.fiu),
+						clone,
+					);
+					parent.removeChild(forElement.previousElementSibling);
+				}
+				documentFragment.prepend(endingAnchor);
 
-				template.removeAttribute('for-each');
-				template.setAttribute('for-each-data', '');
-
-				template.bindingIndex = {};
-				template.ifIndex = {};
-				template.forEachIndex = {};
-				Component.processTemplate(root, template, template);
-
-				Component.setContext(root, template, template, {
-					...inheritedContext,
-					[itemName]: item,
-					index: index,
+				previousKeys.forEach((key) => {
+					if (keys.indexOf(key) === -1) {
+						removes.push(key);
+					}
 				});
-				template.fiu = {
-					for: {
-						data: item,
+				previousKeys = previousKeys.filter(key => !removes.includes(key));
+
+				keys.forEach((key, index) => {
+					const previousIndex = previousKeys.indexOf(key);
+
+					if (previousIndex === -1) {
+						previousKeys.splice(index, 0, key);
+						adds.push([lastKey, index]);
+					} else if (previousIndex !== index) {
+						const keyInSpot = previousKeys.splice(index, 1)[0],
+							keyForSpot = previousKeys.splice(previousIndex - 1, 1)[0];
+
+						previousKeys.splice(index, 0, keyForSpot);
+						previousKeys.splice(previousIndex, 0, keyInSpot);
+
+						moves.push([keyInSpot, keyForSpot]);
+					}
+					lastKey = key;
+				});
+
+				removes.forEach((remove, index) => {
+					clonedKeyElementMapping.get(remove).remove();
+					clonedKeyElementMapping.delete(remove);
+				});
+
+				moves.forEach((move, index) => {
+					const elementInSpot = clonedKeyElementMapping.get(move[0]),
+						elementForSpot = clonedKeyElementMapping.get(move[1]),
+						marker = document.createElement('for-each-marker');
+
+					elementForSpot.after(marker);
+					elementInSpot.after(elementForSpot);
+					marker.before(elementInSpot);
+					marker.remove();
+				});
+
+				adds.forEach((add, index) => {
+					const [lastKey, addIndex] = add,
+						template = document.importNode(entry.template, true),
+						anchor = lastKey ? clonedKeyElementMapping.get(lastKey) : endingAnchor;
+
+					template.bindingIndex = {};
+					template.ifIndex = {};
+					template.forEachIndex = {};
+					Component.processTemplate(root, template, template);
+
+					Component.setContext(root, template, template, {
+						...inheritedContext,
+						[itemName]: items[addIndex],
+						index: addIndex,
+					});
+					template.fiu = items[addIndex];
+
+					anchor.after(template);
+
+					clonedKeyElementMapping.set(keys[addIndex], template);
+				});
+
+				entry.previousKeys = keys;
+				entry.keyElementMapping = clonedKeyElementMapping;
+				documentFragment.removeChild(endingAnchor);
+			} else {
+				while (forElement.previousElementSibling) {
+					parent.removeChild(forElement.previousElementSibling);
+				}
+				items.forEach((item, index) => {
+					const template = document.importNode(entry.template, true);
+
+					template.bindingIndex = {};
+					template.ifIndex = {};
+					template.forEachIndex = {};
+					Component.processTemplate(root, template, template);
+
+					Component.setContext(root, template, template, {
+						...inheritedContext,
+						[itemName]: item,
 						index: index,
-					},
-				};
-				parent.insertBefore(template, forElement);
-			});
+					});
+					template.fiu = item;
+					documentFragment.appendChild(template);
+				});
+			}
+			parent.insertBefore(documentFragment, forElement);
 		});
 	}
 
@@ -560,6 +686,7 @@ export default class Component extends HTMLElement {
 	}
 
 	static setContext(root, owner, templateDocument, change) {
+		// console.time(`Set context ${templateDocument}`);
 		if (!Component.isObject(change)) {
 			throw Error(`Context has to be updated with an object. Got ${ change }`);
 		}
@@ -595,32 +722,36 @@ export default class Component extends HTMLElement {
 				}
 
 				if (selectorKey in owner.bindingIndex) {
-					const innerAttributeName = owner.bindingIndex[selectorKey];
+					const targetSelection = owner.bindingIndex[selectorKey],
+						boundValue = selectorKey.split('.').reduce((blob, prevKey) => blob[prevKey], change);
 
-					templateDocument.querySelectorAll(`[\\[${ innerAttributeName }\\]="${ selectorKey }"]`).forEach((elm) => {
-						const boundValue = selectorKey.split('.').reduce((blob, prevKey) => blob[prevKey], change);
+					if (Array.isArray(targetSelection)) {
+						targetSelection.forEach((textNode) => {
+							textNode.textContent = boundValue;
+						});
+					} else {
+						templateDocument.querySelectorAll(`[\\[${ targetSelection }\\]="${ selectorKey }"]`).forEach((elm) => {
+							if (targetSelection.includes('.')) {
+								const split = targetSelection.split('\\.');
 
-						if (innerAttributeName.includes('.')) {
-							const split = innerAttributeName.split('\\.');
-
-							if (split[0] === 'attr') {
-								elm.setAttribute(split[1], boundValue);
-							} else if (split[0] === 'style') {
-								elm.style[split[1]] = boundValue;
+								if (split[0] === 'attr') {
+									elm.setAttribute(split[1], boundValue);
+								} else if (split[0] === 'style') {
+									elm.style[split[1]] = boundValue;
+								}
+							} else if (elm instanceof Component) {
+								elm.templateLoaded.then(() => {
+									elm[targetSelection] = boundValue;
+								});
+							} else {
+								elm[targetSelection] = boundValue;
 							}
-						} else if (elm instanceof Component) {
-							elm.templateLoaded.then(() => {
-								elm[innerAttributeName] = boundValue;
-							});
-						} else if (PROPERTY_NAMES_MAP[innerAttributeName]) {
-							elm[PROPERTY_NAMES_MAP[innerAttributeName]] = boundValue;
-						} else {
-							elm[innerAttributeName] = boundValue;
-						}
-					});
+						});
+					}
 				}
 			});
 		});
+		// console.timeEnd(`Set context ${templateDocument}`);
 	}
 
 	static spreadPath(key, value) {

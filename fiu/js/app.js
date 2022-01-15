@@ -42,7 +42,7 @@ export default class App {
 			document.adoptedStyleSheets = [...stylesheets];
 		});
 
-		if (config.httpEndpointStub) {
+		if (typeof config.httpEndpointStub !== 'undefined') {
 			httpPromise = import('./http.js');
 
 			if (config.authenticationModule) {

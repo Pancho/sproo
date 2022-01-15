@@ -37,12 +37,32 @@ export default class BazaTablesComponent extends Component {
 		},
 	];
 	data = {};
+	rotation = 4;
+	blob = {};
 
-	onTemplateLoaded() {
-		this.app.http.get('/app/tables.json')
+	rotate() {
+		if (this.rotation === 5) {
+			this.rotation = 0
+		}
+		this.app.http.get(`/app/tables-${this.rotation}.json`)
 			.then((response) => response.json())
 			.then((json) => {
 				this.data = json;
+				this.blob = JSON.stringify(json, undefined, 4);
+			});
+
+		this.rotation += 1;
+	}
+
+	onTemplateLoaded() {
+		this.app.http.get('/app/tables.json')
+		// this.app.http.get('/app/tables-short.json')
+		// this.app.http.get('/app/tables-0.json')
+		// this.app.http.get('/app/tables-3.json')
+			.then((response) => response.json())
+			.then((json) => {
+				this.data = json;
+				this.blob = JSON.stringify(json, undefined, 2);
 			});
 	}
 }

@@ -12,9 +12,12 @@ export default class Http {
 			throw new Error('Only one instance of Http allowed');
 		}
 
-		if (!httpEndpointStub) {
+		if (typeof httpEndpointStub === 'undefined') {
 			throw new Error(`You cannot have a Http instance without providing a stub
 			(stem, first part, http://www.example.com/api/v1/or/something) from which we build the rest of the URL to hit`);
+		}
+		if (!httpEndpointStub) {
+			httpEndpointStub = '';
 		}
 
 		Http.instance = this;

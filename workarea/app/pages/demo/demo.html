@@ -5,54 +5,57 @@
 		<a route="/empty/test">To Empty Test</a>
 		<div fiu-ref="paragraphContainer">
 			<p [text-content]="blah"></p>
+			<p>Some blah: {{ blah2 }}
+				<span>And some nested {{ blah2 }} as well as {{ blah3.key }}/{{ blah3.value }}</span>
+			</p>
 		</div>
-		<child-component [coords]="coords" (values-updated)="notifyValuesUpdated"></child-component>
-		<div fiu-ref="ifContainer">
-			<p>Boolean Value - Testing IF attribute: <span [text-content]="booleanValue"></span> | <span if="booleanValue">Displayed</span><span if="!booleanValue">Hidden</span></p>
-		</div>
-		<p>Tick <span [text-content]="outerScopeText"></span></p>
-		<div id="for-container" fiu-ref="forContainer">
-			<ol>
-				<li for-each="item in testList">
-					<h6 [text-content]="item.title"></h6>
-					<p [text-content]="item.text"></p>
-					<p>Index: <span [text-content]="index"></span></p>
-					<p>Published on <span [text-content]="item.date"></span></p>
-					<p>Tick <span [text-content]="outerScopeText"></span></p>
-					<a (click)="forElementClick">Click me</a>
-				</li>
-			</ol>
-		</div>
-		<div id="nested">
-			<ol>
-				<li class="first-step" for-each="item in nested">
-					<h6 [text-content]="item.name"></h6>
-					<p [text-content]="index"></p>
-					<ul>
-						<li class="second-step" for-each="other in item.children">
-							<p>Other name: <span [text-content]="other.name"></span></p>
-							<p>Other other: <span [text-content]="other.other"></span></p>
-							<h6>Item name: <span [text-content]="item.name"></span></h6>
-							<p>Root string binding: <span [text-content]="blah"></span></p>
-							<p>Testing Inner boolean: <span if="other.booleanValue">Displayed Inner</span></p>
-							<p>Testing boolean: <span if="booleanValue">Displayed</span></p>
-							<p>Inner boolean value: <span [text-content]="other.booleanValue"></span></p>
-							<p>Root boolean value: <span [text-content]="booleanValue"></span></p>
-							<p>Tick <span [text-content]="outerScopeText"></span></p>
-							<a (click)="forElementClick">Click me</a>
-						</li>
-					</ul>
-				</li>
-			</ol>
-		</div>
-		<div id="dict">
-			<ol>
-				<li class="first-level-dict" for-each="item in dictFor">
-					<h6 [text-content]="item.key"></h6>
-					<h6 [text-content]="item.value"></h6>
-					<p [text-content]="index"></p>
-				</li>
-			</ol>
-		</div>
+<!--		<child-component [coords]="coords" (values-updated)="notifyValuesUpdated"></child-component>-->
+<!--		<div fiu-ref="ifContainer">-->
+<!--			<p>Boolean Value - Testing IF attribute: <span [text-content]="booleanValue"></span> | <span if="booleanValue">Displayed</span><span if="!booleanValue">Hidden</span></p>-->
+<!--		</div>-->
+<!--		<p>Tick <span [text-content]="outerScopeText"></span></p>-->
+<!--		<div id="for-container" fiu-ref="forContainer">-->
+<!--			<ol>-->
+<!--				<li for-each="item in testList">-->
+<!--					<h6 [text-content]="item.title"></h6>-->
+<!--					<p [text-content]="item.text"></p>-->
+<!--					<p>Index: <span [text-content]="index"></span></p>-->
+<!--					<p>Published on <span [text-content]="item.date"></span></p>-->
+<!--					<p>Tick <span [text-content]="outerScopeText"></span></p>-->
+<!--					<a (click)="forElementClick">Click me</a>-->
+<!--				</li>-->
+<!--			</ol>-->
+<!--		</div>-->
+<!--		<div id="nested">-->
+<!--			<ol>-->
+<!--				<li class="first-step" for-each="item in nested">-->
+<!--					<h6 [text-content]="item.name"></h6>-->
+<!--					<p [text-content]="index"></p>-->
+<!--					<ul>-->
+<!--						<li class="second-step" for-each="other in item.children">-->
+<!--							<p>Other name: <span [text-content]="other.name"></span></p>-->
+<!--							<p>Other other: <span [text-content]="other.other"></span></p>-->
+<!--							<h6>Item name: <span [text-content]="item.name"></span></h6>-->
+<!--							<p>Root string binding: <span [text-content]="blah"></span></p>-->
+<!--							<p>Testing Inner boolean: <span if="other.booleanValue">Displayed Inner</span></p>-->
+<!--							<p>Testing boolean: <span if="booleanValue">Displayed</span></p>-->
+<!--							<p>Inner boolean value: <span [text-content]="other.booleanValue"></span></p>-->
+<!--							<p>Root boolean value: <span [text-content]="booleanValue"></span></p>-->
+<!--							<p>Tick <span [text-content]="outerScopeText"></span></p>-->
+<!--							<a (click)="forElementClick">Click me</a>-->
+<!--						</li>-->
+<!--					</ul>-->
+<!--				</li>-->
+<!--			</ol>-->
+<!--		</div>-->
+<!--		<div id="dict">-->
+<!--			<ol>-->
+<!--				<li class="first-level-dict" for-each="item in dictFor">-->
+<!--					<h6 [text-content]="item.key"></h6>-->
+<!--					<h6 [text-content]="item.value"></h6>-->
+<!--					<p [text-content]="index"></p>-->
+<!--				</li>-->
+<!--			</ol>-->
+<!--		</div>-->
 	</div>
 </main>
