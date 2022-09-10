@@ -1,20 +1,19 @@
 /* From: https://stackoverflow.com/a/61868531 */
 export default class DeepProxy {
 	constructor(target, handler) {
-		this.preproxy = new WeakMap;
+		this.original = new WeakMap;
 		this.handler = handler;
-
-		return this.wrap(target, []);
+		this.proxy = this.wrap(target, []);
 	}
 
 	unwrap(obj, key) {
-		if (this.preproxy.has(obj[key])) {
-			obj[key] = this.preproxy.get(obj[key]);
-			this.preproxy.delete(obj[key]);
+		if (this.original.has(obj[key])) {
+			obj[key] = this.original.get(obj[key]);
+			this.original.delete(obj[key]);
 		}
 
 		Object.keys(obj[key]).forEach((elm) => {
-        	if (typeof obj[key][elm] === 'object') {
+			if (typeof obj[key][elm] === 'object') {
 				this.unwrap(obj[key], elm);
 			}
 		});
@@ -27,11 +26,11 @@ export default class DeepProxy {
 			}
 		}
 
-		const p = new Proxy(obj, this.makeHandler(path));
+		const proxy = new Proxy(obj, this.makeHandler(path));
 
-		this.preproxy.set(p, obj);
+		this.original.set(proxy, obj);
 
-		return p;
+		return proxy;
 	}
 
 	makeHandler(path) {
@@ -39,14 +38,16 @@ export default class DeepProxy {
 
 		return {
 			set(target, key, value, receiver) {
+				let handlerValue = value;
+
 				if (typeof value === 'object') {
-					value = deepProxy.wrap(value, [...path, key]);
+					handlerValue = deepProxy.wrap(value, [...path, key]);
 				}
 
-				target[key] = value;
+				target[key] = handlerValue;
 
 				if (deepProxy.handler.set) {
-					deepProxy.handler.set(target, [...path, key], value, receiver);
+					deepProxy.handler.set(target, [...path, key], handlerValue, receiver);
 				}
 
 				return true;

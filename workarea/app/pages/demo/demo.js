@@ -67,7 +67,7 @@ export default class DemoPageComponent extends Component {
 		prop1: 'Prop 1',
 		prop2: 'Prop 2',
 		prop3: 'Prop 3',
-	}
+	};
 	valuesUpdated = false;
 	booleanValue = true;
 	coordinates = '(0, 0)';
@@ -114,7 +114,12 @@ export default class DemoPageComponent extends Component {
 			];
 		}, 2000);
 		this.nested.push({name: 'Third'});
-		this.nested[0].children = {name: 'Third'};
+		this.nested[0].children = [
+			{
+				name: 'Third',
+				booleanValue: false,
+			},
+		];
 		this.testList.push({
 			title: 'Test Title 4',
 			text: 'Lorem ipsum dolor sit amet 4',

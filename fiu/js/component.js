@@ -4,7 +4,7 @@ import utils from './utils/index.js';
 
 const CLEAN_TRAILING_SLASH = /\/+$/u,
 	CLEAN_LEADING_SLASH = /^\/+/u,
-	TEXT_NODE_TAGS = /({{.+?}})/g;
+	TEXT_NODE_TAGS = /(\{\{.+?\}\})/u;
 
 
 export default class Component extends HTMLElement {
@@ -100,15 +100,17 @@ export default class Component extends HTMLElement {
 						}
 
 						obj[name] = new utils.DeepProxy(obj[name], {
-							get: function (target, property, receiver) {
+							get: function () {
 								return obj[internalName];
 							},
-							set: function (target, property, value, receiver) {
+							set: function (target, property) {
 								if (!property.includes('length')) {
 									Component.setContext(obj, obj, obj.shadowRoot, {[name]: obj[internalName]});
 								}
 							},
-						});
+						}).proxy;
+
+						return false;
 					});
 
 				if (templateDocument instanceof Node) {
@@ -249,17 +251,16 @@ export default class Component extends HTMLElement {
 	}
 
 	static parseIf(owner, templateDocument) {
-		let refElement = null;
+		let refElement = templateDocument.querySelector('[if]');
 
-		while (refElement = templateDocument.querySelector('[if]')) {
-			const attributeValue = refElement.getAttribute('if');
+		while (refElement) {
+			const attributeValue = refElement.getAttribute('if'),
+				clone = document.importNode(refElement, true),
+				ifElement = document.createElement('fiu-if');
 
 			if (!owner.ifIndex[attributeValue]) {
 				owner.ifIndex[attributeValue] = [];
 			}
-
-			const clone = document.importNode(refElement, true),
-				ifElement = document.createElement('fiu-if');
 
 			refElement.parentElement.insertBefore(ifElement, refElement);
 			refElement.parentElement.removeChild(refElement);
@@ -267,13 +268,14 @@ export default class Component extends HTMLElement {
 				elm: clone,
 				ifElement: ifElement,
 			});
+			refElement = templateDocument.querySelector('[if]');
 		}
 	}
 
 	static parseForEach(root, owner, templateDocument) {
-		let refElement = null;
+		let refElement = templateDocument.querySelector('[for-each]');
 
-		while (refElement = templateDocument.querySelector('[for-each]')) {
+		while (refElement) {
 			const template = document.importNode(refElement, true),
 				forElement = document.createElement('fiu-for-each'),
 				split = refElement.getAttribute('for-each').split(' in '),
@@ -297,14 +299,16 @@ export default class Component extends HTMLElement {
 				itemName: itemName,
 				keyIdentifier: keyIdentifier,
 				previousKeys: [],
-				keyElementMapping: new Map, // We'll use map here, to keep element order, so we can use document fragment to reduce repaints when reacting to changes
+				// We'll use map here, to keep element order, so we can use document fragment to reduce repaints when reacting to changes
+				keyElementMapping: new Map,
 			});
+			refElement = templateDocument.querySelector('[for-each]');
 		}
 	}
 
 	static parseFiuAttributes(root, owner, templateDocument) {
 		const iter = document.createNodeIterator(templateDocument, NodeFilter.SHOW_TEXT);
-		let textNode;
+		let textNode = iter.nextNode();
 
 		templateDocument.querySelectorAll('*').forEach((refElement) => {
 			const attributeNames = refElement.getAttributeNames();
@@ -366,7 +370,7 @@ export default class Component extends HTMLElement {
 			}
 		});
 
-		while (textNode = iter.nextNode()) {
+		while (textNode) {
 			const parent = textNode.parentNode;
 
 			// If (textNode.textContent.includes('{{')) {
@@ -401,6 +405,8 @@ export default class Component extends HTMLElement {
 				textNode.after(...nodes);
 				parent.removeChild(textNode);
 			}
+
+			textNode = iter.nextNode();
 		}
 	}
 
@@ -494,12 +500,12 @@ export default class Component extends HTMLElement {
 					lastKey = key;
 				});
 
-				removes.forEach((remove, index) => {
+				removes.forEach((remove) => {
 					clonedKeyElementMapping.get(remove).remove();
 					clonedKeyElementMapping.delete(remove);
 				});
 
-				moves.forEach((move, index) => {
+				moves.forEach((move) => {
 					const elementInSpot = clonedKeyElementMapping.get(move[0]),
 						elementForSpot = clonedKeyElementMapping.get(move[1]),
 						marker = document.createElement('for-each-marker');
@@ -510,10 +516,10 @@ export default class Component extends HTMLElement {
 					marker.remove();
 				});
 
-				adds.forEach((add, index) => {
-					const [lastKey, addIndex] = add,
+				adds.forEach((add) => {
+					const [addLastKey, addIndex] = add,
 						template = document.importNode(entry.template, true),
-						anchor = lastKey ? clonedKeyElementMapping.get(lastKey) : endingAnchor;
+						anchor = addLastKey ? clonedKeyElementMapping.get(addLastKey) : endingAnchor;
 
 					template.bindingIndex = {};
 					template.ifIndex = {};
@@ -574,13 +580,10 @@ export default class Component extends HTMLElement {
 			const selectorKeys = Component.isObject(value) ? [key, ...Component.spreadPath(key, value).flat()] : [key];
 
 			selectorKeys.forEach((selectorKey) => {
-				if (selectorKey === 'other.booleanValue') {
-				}
-
 				if (selectorKey in owner.ifIndex) {
 					const extractedValue = selectorKey.split('.').slice(1).reduce((previous, current) => previous[current], value);
 
-					owner.ifIndex[selectorKey].forEach((entry) => {
+					owner.ifIndex[selectorKey].forEach(() => {
 						Component.processIf(root, owner, selectorKey, extractedValue, owner.templateContext);
 					});
 				}
@@ -589,9 +592,9 @@ export default class Component extends HTMLElement {
 					const extractedValue = selectorKey.split('.').slice(1).reduce((previous, current) => previous[current], value);
 
 					if (Component.isObject(extractedValue)) {
-						Component.processForEach(root, owner, selectorKey, Object.entries(extractedValue).map(([key, value]) => ({
-							key: key,
-							value: value,
+						Component.processForEach(root, owner, selectorKey, Object.entries(extractedValue).map(([forKey, forValue]) => ({
+							key: forKey,
+							value: forValue,
 						})), owner.templateContext);
 					} else if (Array.isArray(extractedValue)) {
 						Component.processForEach(root, owner, selectorKey, extractedValue, owner.templateContext);

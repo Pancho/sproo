@@ -1,10 +1,8 @@
-export default function debounce(func, timeout = 300) {
+export default function debounce(func, delay) {
 	let timer = 0;
 
-	return (...args) => {
+	return (() => {
 		clearTimeout(timer);
-		timer = setTimeout(() => {
-			func.apply(this, args);
-		}, timeout);
-	};
+		timer = setTimeout(() => func(), delay);
+	})();
 }
