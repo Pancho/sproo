@@ -1,7 +1,7 @@
 /* From: https://stackoverflow.com/a/61868531 */
 export default class DeepProxy {
 	constructor(target, handler) {
-		this.preproxy = new WeakMap();
+		this.preproxy = new WeakMap;
 		this.handler = handler;
 
 		return this.wrap(target, []);

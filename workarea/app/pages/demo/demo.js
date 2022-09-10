@@ -13,22 +13,22 @@ export default class DemoPageComponent extends Component {
 	paragraphContainer;
 	testList = [
 		{
-			title: 'Test Title 1',
-			text: 'Lorem ipsum dolor sit amet 1',
-			date: '01.01.2021',
+			Title: 'Test Title 1',
+			Text: 'Lorem ipsum dolor sit amet 1',
+			Date: '01.01.2021',
 		},
 		{
-			title: 'Test Title 2',
-			text: 'Lorem ipsum dolor sit amet 2',
-			date: '02.01.2021',
+			Title: 'Test Title 2',
+			Text: 'Lorem ipsum dolor sit amet 2',
+			Date: '02.01.2021',
 		},
 		{
-			title: 'Test Title 3',
-			text: 'Lorem ipsum dolor sit amet 3',
-			date: '03.01.2021',
+			Title: 'Test Title 3',
+			Text: 'Lorem ipsum dolor sit amet 3',
+			Date: '03.01.2021',
 		},
 	];
-	outerScopeText = '/////////////////';
+	timestampText = '/////////////////';
 	nested = [
 		{
 			name: 'First',
@@ -51,10 +51,12 @@ export default class DemoPageComponent extends Component {
 				{
 					name: 'Child of second 1',
 					other: 'Child of second other 1',
+					booleanValue: false,
 				},
 				{
 					name: 'Child of second 2',
 					other: 'Child of second other 2',
+					booleanValue: true,
 				},
 			],
 		},
@@ -68,78 +70,78 @@ export default class DemoPageComponent extends Component {
 	}
 	valuesUpdated = false;
 	booleanValue = true;
-	blah = '(0, 0)';
-	blah2 = '(0, 0)';
-	blah3 = {};
+	coordinates = '(0, 0)';
+	coordinates2 = '(0, 0)';
+	coordinates3 = {};
 	coords = {
 		x: 0,
 		y: 0,
 	};
 
 	onTemplateLoaded() {
-		setInterval(_ => {
-			this.outerScopeText = +(new Date());
+		setInterval((_) => {
+			this.timestampText = Number(new Date);
 		}, 1000);
-		// setTimeout(_ => {
-		// 	// this.nested[2] = {name: 'Third'};
-		// 	this.nested.push({name: 'Third'});
-		// 	this.nested[2].children = [
-		// 		{
-		// 			name: 'Child of third 1',
-		// 			Other: 'Child of third other 1',
-		// 			booleanValue: false,
-		// 		},
-		// 		{
-		// 			name: 'Child of third 2',
-		// 			other: 'Child of third other 2',
-		// 			booleanValue: false,
-		// 		},
-		// 	];
-		// }, 1000);
-		// setTimeout(_ => {
-		// 	// this.nested[2] = {name: 'Third'};
-		// 	this.nested.push({name: 'Fourth'});
-		// 	this.nested[3].children = [
-		// 		{
-		// 			name: 'Child of fourth 1',
-		// 			other: 'Child of fourth other 1',
-		// 			booleanValue: false,
-		// 		},
-		// 		{
-		// 			name: 'Child of fourth 2',
-		// 			other: 'Child of fourth other 2',
-		// 		},
-		// 	];
-		// }, 2000);
-		// this.nested.push({name: 'Third'})
-		// this.nested[0].children = {name: 'Third'}
-		// this.testList.push({
-		// 	title: 'Test Title 4',
-		// 	text: 'Lorem ipsum dolor sit amet 4',
-		// 	date: '04.01.2021',
-		// });
-		// setTimeout(_ => {
-		// 	this.testList.push({
-		// 		title: 'Test Title 5',
-		// 		text: 'Lorem ipsum dolor sit amet 5',
-		// 		date: '05.01.2021',
-		// 	});
-		// }, 2000);
-		// setTimeout(_ => {
-		// 	this.testList.pop();
-		// }, 4000);
-		// setTimeout(_ => {
-		// 	this.testList.shift();
-		// }, 6000);
+		setTimeout((_) => {
+			// This.nested[2] = {name: 'Third'};
+			this.nested.push({name: 'Third'});
+			this.nested[2].children = [
+				{
+					name: 'Child of third 1',
+					other: 'Child of third other 1',
+					booleanValue: false,
+				},
+				{
+					name: 'Child of third 2',
+					other: 'Child of third other 2',
+					booleanValue: false,
+				},
+			];
+		}, 1000);
+		setTimeout((_) => {
+			// This.nested[2] = {name: 'Third'};
+			this.nested.push({name: 'Fourth'});
+			this.nested[3].children = [
+				{
+					name: 'Child of fourth 1',
+					other: 'Child of fourth other 1',
+					booleanValue: false,
+				},
+				{
+					name: 'Child of fourth 2',
+					other: 'Child of fourth other 2',
+				},
+			];
+		}, 2000);
+		this.nested.push({name: 'Third'});
+		this.nested[0].children = {name: 'Third'};
+		this.testList.push({
+			title: 'Test Title 4',
+			text: 'Lorem ipsum dolor sit amet 4',
+			date: '04.01.2021',
+		});
+		setTimeout((_) => {
+			this.testList.push({
+				title: 'Test Title 5',
+				text: 'Lorem ipsum dolor sit amet 5',
+				date: '05.01.2021',
+			});
+		}, 2000);
+		setTimeout((_) => {
+			this.testList.pop();
+		}, 4000);
+		setTimeout((_) => {
+			this.testList.shift();
+		}, 6000);
 	}
 
 	logEvent(ev) {
 		this.booleanValue = !this.booleanValue;
 		this.nested[0].children[0].booleanValue = !this.nested[0].children[0].booleanValue;
-		this.blah = `(${ ev.screenX }, ${ ev.screenY })`;
-		this.blah2 = `(${ ev.screenX }, ${ ev.screenY })`;
-		this.blah3.key = ev.screenX;
-		this.blah3.value = ev.screenY;
+		this.coordinates = `(${ ev.screenX }, ${ ev.screenY })`;
+		this.coordinates2 = `(${ ev.screenX }, ${ ev.screenY })`;
+		this.coordinates3.key = ev.screenX;
+		this.coordinates3.value = ev.screenY;
 		this.coords = {
 			x: ev.screenX,
 			y: ev.screenY,

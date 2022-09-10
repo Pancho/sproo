@@ -58,23 +58,6 @@ export default class BazaTableComponent extends BazaComponent {
 		}
 
 		this.internalData = data;
-		// this.internalData.forEach((dataRow) => {
-		// 	const row = this.newElement('tr');
-		//
-		// 	dataRow.forEach((dataCell, index) => {
-		// 		const cell = this.newElement('td');
-		//
-		// 		if (this.internalHeaders[index].transform) {
-		// 			cell.textContent = this.internalHeaders[index].transform(dataCell);
-		// 		} else {
-		// 			cell.textContent = dataCell;
-		// 		}
-		//
-		// 		row.append(cell);
-		// 	});
-		//
-		// 	this.tbody.append(row);
-		// });
 	}
 
 	get data() {

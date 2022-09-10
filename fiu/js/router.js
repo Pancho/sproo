@@ -1,69 +1,3 @@
-/*
-* Modelled after Navigo, no shame. For inspiration, see https://github.com/krasimir/navigo
-*
-* I chose Navigo as an inspiration because it is simple. Really simple; one file, JS code (and it's pretty at that), no complications.
-* I did however rewrite good chunks of code, removed what I don't want to use, made it something I would like to use (renamed properties),
-* but in no way will I deny credits to the original author even if may be hard to tell at this point.
-*
-* Usage of router requires you to specify a couple of things, and it's not self evident which and how.
-*
-* ---routeRoot---
-* This is the leading part of the urls that should be ignored when handling urls with this router. Let's suppose we have our page hosted on
-* a domain www.example.com and we are building our app from /admin forward. In this case routeRoot would be set to
-* https://www.example.com/admin (no trailing slash). You would have to configure your web server (nginx or apache) to serve the same html
-* file for all urls with /admin as the leading part (this is very important) as some users will certainly not start their navigation at
-* that exact root. Root is then subtracted from any url to get only the part that this router handler will handle.
-* Difference from Navigo is that in no way do I want to be guessing the root - set it OR hack this file.
-*
-* ---homePage--- and ---notFound---
-* I'm grouping these two parameters together, because they are somewhat related. The homePage is the handler blob for the exact root url (/)
-* and notFound for those that you did not specify (think 404, and 500 is not really needed as each component can take care of that on its
-* own). Each of those provides only two other properties, like so:
-*
-* specialBlob = {
-*   component: MyGreatComponent
-* }
-*
-* should you want to add some guards for these two, just add the invocation to the before hook (for others it's automatic, should a guard
-* be specified).
-* I diverged from Navigo here in a way where I don't want to have the same code handling the home, regular and not found routes. Home and
-* not found are special cases and most frameworks agree, so I separated them. Navigo separates not found too, but I wanted to have all of
-* the special cases handled in a similar way, not a mix of both worlds.
-*
-* ---routes---
-* This is the meat of this class even though we already touched this with homePage and notFound. In essence, it's a list of blobs, but these
-* blobs must have a certain structure for router to work (duh), so let's start with a full example and we'll dissect it like a frog in a
-* biology class:
-*
-* ...
-* },
-* {
-*   path: '/main',
-*   component: MainComponent
-* },
-* {
-* ...
-*
-* --params--
-* Parameters are the urls variables, since we don't want to rely only on GET parameters (but you still totally can if you please), so we'll
-* take time to explain how to craft url patterns here as well. In the example we set path to '/main', but if we want to use parts of the
-* path to carry parameter data, we simply do it with colons, like so:
-*
-* path: '/main/:param1/something/:param2/also-something'
-*
-* With such url, your component will receive two parameters, called param1 and param2, both of which will be strings, so you will have to
-* parse and cast to desired types. Why not do some casting automatically? We could, but that would truly make this a package worthy of its
-* own name, and this is not our goal. Mostly you pass params that are meant to be either strings or numbers, so no casting should pose any
-* problems.
-*
-* I also wanted to prevent the router from working with urls that use underscores or some other inferior convention, but hell, I will not
-* forsake simplicity to prevent sloppiness. Same goes for param naming convention. Please try to use hyphens for urls (drastically
-* increases url readability, even google recommends this: https://support.google.com/webmasters/answer/76329?hl=en) and camelCase
-* convention for naming your parameters (you're writing JS not Python)
-*
-* Do not try to make a path like '' or '/', because those (or that) are a special case called homePage and are reserved for that.
-*/
-
 export default class Router {
 	[Symbol.toStringTag] = 'Router';
 	static instance;
@@ -81,7 +15,7 @@ export default class Router {
 
 		Router.instance = this;
 
-		this.routeRoot = `${window.location.protocol}//${window.location.host}${routeRoot}`;
+		this.routeRoot = `${ window.location.protocol }//${ window.location.host }${ routeRoot }`;
 		this.authenticationUrl = authenticationUrl;
 
 		window.addEventListener('popstate', (state) => this.resolve(state.target.location.href));

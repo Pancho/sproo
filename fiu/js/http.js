@@ -16,6 +16,7 @@ export default class Http {
 			throw new Error(`You cannot have a Http instance without providing a stub
 			(stem, first part, http://www.example.com/api/v1/or/something) from which we build the rest of the URL to hit`);
 		}
+
 		if (!httpEndpointStub) {
 			httpEndpointStub = '';
 		}
@@ -23,7 +24,8 @@ export default class Http {
 		Http.instance = this;
 
 		const cleanedStub = httpEndpointStub.endsWith('/') ? httpEndpointStub.slice(0, -1) : httpEndpointStub;
-		this.httpEndpointStub = `${window.location.protocol}//${window.location.host}${cleanedStub}`;
+
+		this.httpEndpointStub = `${ window.location.protocol }//${ window.location.host }${ cleanedStub }`;
 		this.authentication = authentication;
 	}
 
