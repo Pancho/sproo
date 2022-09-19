@@ -89,11 +89,14 @@ export default class Component extends HTMLElement {
 								return obj[internalName];
 							},
 							set: function (value) {
-								if (componentReady && typeof value === 'object') {
-									value = Component.newDeepProxy(value, name, obj);
+								let setValue = value;
+
+								if (componentReady && typeof setValue === 'object') {
+									setValue = Component.newDeepProxy(setValue, name, obj);
 								}
-								obj[internalName] = value;
-								Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: value});
+
+								obj[internalName] = setValue;
+								Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: setValue});
 							},
 						});
 
@@ -104,7 +107,7 @@ export default class Component extends HTMLElement {
 						}
 
 						obj[name] = new utils.DeepProxy(obj[name], {
-							set(target, property, value, receiver) {
+							set(target, property) {
 								if (Array.isArray(obj[internalName]) && property.includes('length')) {
 									Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: obj[internalName]});
 								} else {
@@ -258,6 +261,7 @@ export default class Component extends HTMLElement {
 			if (attributeNames.length > 0) {
 				attributeNames.forEach((attributeName) => {
 					const attributeValue = refElement.getAttribute(attributeName);
+
 					if (attributeName.startsWith('(') && attributeName.endsWith(')')) {
 						const eventName = attributeName.replace('(', '').replace(')', '').trim();
 
@@ -279,6 +283,7 @@ export default class Component extends HTMLElement {
 							} else {
 								refElement.eventListeners[eventName] = (ev) => {
 									const result = component[attributeValue](ev);
+
 									if (result === false) {
 										ev.preventDefault();
 										ev.stopPropagation();
@@ -302,10 +307,12 @@ export default class Component extends HTMLElement {
 		Component.parseForEach(component, parent, owner, templateDocument);
 		Component.parseFiuAttributes(component, parent, owner, templateDocument);
 		Component.parseEventHandlers(component, templateDocument);
+
 		if (parent) {
 			if (!parent.childBlocks) {
 				parent.childBlocks = [];
 			}
+
 			if (!parent.childBlocks.includes(owner)) {
 				parent.childBlocks.push(owner);
 			}
@@ -315,7 +322,7 @@ export default class Component extends HTMLElement {
 	}
 
 	static parseIf(component, parent, owner, templateDocument) {
-		let refElements = templateDocument.querySelectorAll('[if]');
+		const refElements = templateDocument.querySelectorAll('[if]');
 
 		refElements.forEach((refElement) => {
 			if (refElement.closest('[for-each]')) {
@@ -337,11 +344,13 @@ export default class Component extends HTMLElement {
 				template: clone,
 				ifElement: ifElement,
 			});
+
+			return false;
 		});
 	}
 
 	static parseForEach(component, parent, owner, templateDocument) {
-		let refElements = templateDocument.querySelectorAll('[for-each]');
+		const refElements = templateDocument.querySelectorAll('[for-each]');
 
 		refElements.forEach((refElement) => {
 			if (refElement.closest('[if]')) {
@@ -373,38 +382,9 @@ export default class Component extends HTMLElement {
 				// We'll use map here, to keep element order, so we can use document fragment to reduce repaints when reacting to changes
 				keyElementMapping: new Map,
 			});
-		});
 
-		// let refElement = templateDocument.querySelector('[for-each]');
-		//
-		// while (refElement) {
-		// 	const template = document.importNode(refElement, true),
-		// 		forElement = document.createElement('fiu-for-each'),
-		// 		split = refElement.getAttribute('for-each').split(' in '),
-		// 		itemName = split[0].trim(),
-		// 		itemsName = split[1].trim(),
-		// 		keyIdentifier = refElement.getAttribute('for-key');
-		//
-		// 	if (!owner.forEachIndex[itemsName]) {
-		// 		owner.forEachIndex[itemsName] = [];
-		// 	}
-		//
-		// 	refElement.parentElement.insertBefore(forElement, refElement);
-		// 	refElement.parentElement.removeChild(refElement);
-		//
-		// 	template.removeAttribute('for-each');
-		// 	template.setAttribute('for-each-data', '');
-		// 	owner.forEachIndex[itemsName].push({
-		// 		template: template,
-		// 		forElement: forElement,
-		// 		itemName: itemName,
-		// 		keyIdentifier: keyIdentifier,
-		// 		previousKeys: [],
-		// 		// We'll use map here, to keep element order, so we can use document fragment to reduce repaints when reacting to changes
-		// 		keyElementMapping: new Map,
-		// 	});
-		// 	refElement = templateDocument.querySelector('[for-each]');
-		// }
+			return false;
+		});
 	}
 
 	static parseFiuAttributes(component, parent, owner, templateDocument) {
@@ -501,7 +481,7 @@ export default class Component extends HTMLElement {
 		owner.forEachIndex[forKey].forEach((entry) => {
 			const forElement = entry.forElement,
 				itemName = entry.itemName,
-				parent = forElement.parentElement,
+				parentElement = forElement.parentElement,
 				keyIdentifier = entry.keyIdentifier,
 				documentFragment = document.createDocumentFragment(),
 				endingAnchor = document.createElement('for-each-ending-anchor');
@@ -514,6 +494,7 @@ export default class Component extends HTMLElement {
 					removes = [],
 					clonedKeyElementMapping = new Map;
 				let lastKey = false;
+
 				while (forElement.previousElementSibling) {
 					const clone = document.importNode(forElement.previousElementSibling, true);
 
@@ -523,7 +504,7 @@ export default class Component extends HTMLElement {
 						keyIdentifier.split('.').reduce((previous, current) => previous[current], clone.fiu),
 						clone,
 					);
-					parent.removeChild(forElement.previousElementSibling);
+					parentElement.removeChild(forElement.previousElementSibling);
 				}
 
 				documentFragment.prepend(endingAnchor);
@@ -578,7 +559,6 @@ export default class Component extends HTMLElement {
 					template.bindingIndex = {};
 					template.ifIndex = {};
 					template.forEachIndex = {};
-					// This returns a list of bindings inside, and parent's fors (and ifs) should be notified somehow that they should update if that value changes
 					Component.parseTemplate(component, owner, template, template);
 
 					Component.setContext(component, owner, template, template, {
@@ -596,7 +576,7 @@ export default class Component extends HTMLElement {
 				documentFragment.removeChild(endingAnchor);
 			} else {
 				while (forElement.previousElementSibling) {
-					parent.removeChild(forElement.previousElementSibling);
+					parentElement.removeChild(forElement.previousElementSibling);
 				}
 
 				items.forEach((item, index) => {
@@ -617,7 +597,7 @@ export default class Component extends HTMLElement {
 				});
 			}
 
-			parent.insertBefore(documentFragment, forElement);
+			parentElement.insertBefore(documentFragment, forElement);
 		});
 	}
 
@@ -719,7 +699,7 @@ export default class Component extends HTMLElement {
 
 	static newDeepProxy(value, name, obj) {
 		return new utils.DeepProxy(value, {
-			set: function (target, property, x, y, z) {
+			set: function (target, property) {
 				if (Array.isArray(value) && property.includes('length')) {
 					Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: value});
 				} else {
@@ -732,9 +712,9 @@ export default class Component extends HTMLElement {
 	// https://stackoverflow.com/a/48218209
 	static deepMerge(...objects) {
 		return objects.reduce((previous, current) => {
-			Object.keys(current).forEach(key => {
-				const previousValue = previous[key];
-				const currentValue = current[key];
+			Object.keys(current).forEach((key) => {
+				const previousValue = previous[key],
+					currentValue = current[key];
 
 				if (Array.isArray(previousValue) && Array.isArray(currentValue)) {
 					previous[key] = previousValue.concat(...currentValue);

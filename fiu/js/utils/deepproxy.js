@@ -1,7 +1,4 @@
 /* From: https://stackoverflow.com/a/61868531 */
-const ARRAY_REMOVES = ['pop', 'shift'],
-	ARRAY_ADDS = ['push', 'unshift'];
-
 export default class DeepProxy {
 	constructor(target, handler) {
 		this.original = new WeakMap;
@@ -30,6 +27,7 @@ export default class DeepProxy {
 		}
 
 		const proxy = new Proxy(obj, this.makeHandler(path));
+
 		this.original.set(proxy, obj);
 
 		return proxy;

@@ -87,7 +87,7 @@ export default class DemoPageComponent extends Component {
 				prop3: 'Prop 3',
 			};
 		}, 1000);
-		// setTimeout((_) => {
+		// SetTimeout((_) => {
 		setInterval((_) => {
 			this.timestampText = Number(new Date);
 		}, 1000);
@@ -137,7 +137,7 @@ export default class DemoPageComponent extends Component {
 		setTimeout((_) => {
 			console.log('sort start');
 			this.testList.reverse();
-			console.log('sort end')
+			console.log('sort end');
 		}, 2000);
 		setTimeout(() => {
 			console.log('push start', this.testList);
@@ -157,7 +157,7 @@ export default class DemoPageComponent extends Component {
 		setTimeout((_) => {
 			console.log('shift start');
 			this.testList.shift();
-			console.log('shift end')
+			console.log('shift end');
 		}, 5000);
 	}
 
@@ -186,6 +186,7 @@ export default class DemoPageComponent extends Component {
 			text: 'Lorem ipsum dolor sit amet 999',
 			date: '05.01.2021',
 		});
+
 		return false;
 	}
 
