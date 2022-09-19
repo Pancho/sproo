@@ -9,25 +9,12 @@ export default class DemoPageComponent extends Component {
 		'/fiu/css/normalize',
 		'/app/pages/demo/demo',
 	];
-	static registerComponents = ['/app/components/child-component/child-component.js'];
-	paragraphContainer;
-	testList = [
-		{
-			Title: 'Test Title 1',
-			Text: 'Lorem ipsum dolor sit amet 1',
-			Date: '01.01.2021',
-		},
-		{
-			Title: 'Test Title 2',
-			Text: 'Lorem ipsum dolor sit amet 2',
-			Date: '02.01.2021',
-		},
-		{
-			Title: 'Test Title 3',
-			Text: 'Lorem ipsum dolor sit amet 3',
-			Date: '03.01.2021',
-		},
+	static registerComponents = [
+		'/app/components/child-component/child-component.js',
+		'/app/components/json-component/json-component.js',
 	];
+	paragraphContainer;
+	testList = [];
 	timestampText = '/////////////////';
 	nested = [
 		{
@@ -44,6 +31,7 @@ export default class DemoPageComponent extends Component {
 					booleanValue: false,
 				},
 			],
+			booleanValue: true,
 		},
 		{
 			name: 'Second',
@@ -61,13 +49,7 @@ export default class DemoPageComponent extends Component {
 			],
 		},
 	];
-	dictFor = {
-		name: 'Name',
-		lastName: 'Lastname',
-		prop1: 'Prop 1',
-		prop2: 'Prop 2',
-		prop3: 'Prop 3',
-	};
+	dictFor = {};
 	valuesUpdated = false;
 	booleanValue = true;
 	coordinates = '(0, 0)';
@@ -79,11 +61,38 @@ export default class DemoPageComponent extends Component {
 	};
 
 	onTemplateLoaded() {
+		setTimeout(() => {
+			this.testList = [
+				{
+					title: 'Test Title 1',
+					text: 'Lorem ipsum dolor sit amet 1',
+					date: '01.01.2021',
+				},
+				{
+					title: 'Test Title 2',
+					text: 'Lorem ipsum dolor sit amet 2',
+					date: '02.01.2021',
+				},
+				{
+					title: 'Test Title 3',
+					text: 'Lorem ipsum dolor sit amet 3',
+					date: '03.01.2021',
+				},
+			];
+			this.dictFor = {
+				name: 'Name',
+				lastName: 'Lastname',
+				prop1: 'Prop 1',
+				prop2: 'Prop 2',
+				prop3: 'Prop 3',
+			};
+		}, 1000);
+		// setTimeout((_) => {
 		setInterval((_) => {
 			this.timestampText = Number(new Date);
 		}, 1000);
 		setTimeout((_) => {
-			// This.nested[2] = {name: 'Third'};
+			this.nested[2] = {name: 'Third'};
 			this.nested.push({name: 'Third'});
 			this.nested[2].children = [
 				{
@@ -126,22 +135,35 @@ export default class DemoPageComponent extends Component {
 			date: '04.01.2021',
 		});
 		setTimeout((_) => {
+			console.log('sort start');
+			this.testList.reverse();
+			console.log('sort end')
+		}, 2000);
+		setTimeout(() => {
+			console.log('push start', this.testList);
 			this.testList.push({
 				title: 'Test Title 5',
 				text: 'Lorem ipsum dolor sit amet 5',
 				date: '05.01.2021',
 			});
-		}, 2000);
+			console.log('push end');
+		}, 3000);
 		setTimeout((_) => {
+			console.log('pop start');
 			this.testList.pop();
+			this.dictFor['x'] = 'y';
+			console.log('pop end');
 		}, 4000);
 		setTimeout((_) => {
+			console.log('shift start');
 			this.testList.shift();
-		}, 6000);
+			console.log('shift end')
+		}, 5000);
 	}
 
 	logEvent(ev) {
 		this.booleanValue = !this.booleanValue;
+		this.nested[0].booleanValue = !this.nested[0].booleanValue;
 		this.nested[0].children[0].booleanValue = !this.nested[0].children[0].booleanValue;
 		this.coordinates = `(${ ev.screenX }, ${ ev.screenY })`;
 		this.coordinates2 = `(${ ev.screenX }, ${ ev.screenY })`;
@@ -157,7 +179,18 @@ export default class DemoPageComponent extends Component {
 		this.valuesUpdated = true;
 	}
 
+	addRecord() {
+		console.log(this.testList);
+		this.testList.push({
+			title: 'Test Title 999',
+			text: 'Lorem ipsum dolor sit amet 999',
+			date: '05.01.2021',
+		});
+		return false;
+	}
+
 	forElementClick(ev, x, y) {
 		console.log('forElementClick', ev, x, y);
+		ev.stopPropagation();
 	}
 }

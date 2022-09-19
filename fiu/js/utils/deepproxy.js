@@ -1,4 +1,7 @@
 /* From: https://stackoverflow.com/a/61868531 */
+const ARRAY_REMOVES = ['pop', 'shift'],
+	ARRAY_ADDS = ['push', 'unshift'];
+
 export default class DeepProxy {
 	constructor(target, handler) {
 		this.original = new WeakMap;
@@ -27,7 +30,6 @@ export default class DeepProxy {
 		}
 
 		const proxy = new Proxy(obj, this.makeHandler(path));
-
 		this.original.set(proxy, obj);
 
 		return proxy;
@@ -37,22 +39,21 @@ export default class DeepProxy {
 		const deepProxy = this;
 
 		return {
-			set(target, key, value, receiver) {
+			set(target, property, value, receiver) {
 				let handlerValue = value;
 
 				if (typeof value === 'object') {
-					handlerValue = deepProxy.wrap(value, [...path, key]);
+					handlerValue = deepProxy.wrap(value, [...path, property]);
 				}
 
-				target[key] = handlerValue;
+				target[property] = handlerValue;
 
 				if (deepProxy.handler.set) {
-					deepProxy.handler.set(target, [...path, key], handlerValue, receiver);
+					deepProxy.handler.set(target, [...path, property], handlerValue, receiver);
 				}
 
 				return true;
 			},
-
 			deleteProperty(target, key) {
 				if (Reflect.has(target, key)) {
 					deepProxy.unwrap(target, key);
