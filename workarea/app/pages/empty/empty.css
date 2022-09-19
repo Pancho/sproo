@@ -1,8 +1,0 @@
-/*This is just a test CSS that doesn't or rather shouldn't apply any styles to any elements found in either (file or in component) templates for empty component.*/
-blockquote {display:block;}
-img {display:inline-block;}
-hr {color:red;}
-button {border-radius:3px;}
-font {margin:0;}
-i {display:inline-block;}
-.bg-bluegrey-5 {background-color:rgba(236,239,241,1.0);}

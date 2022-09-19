@@ -31,3 +31,8 @@ Thumbs.db
 # "documents" #
 ###############
 todo.txt
+workarea
+tests
+nginx
+docker-compose.yml
+baza/todo
