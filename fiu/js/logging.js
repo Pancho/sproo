@@ -1,5 +1,4 @@
 const LEVELS = [
-		'with-warnings',
 		'trace',
 		'debug',
 		'log',
@@ -8,64 +7,14 @@ const LEVELS = [
 	],
 	WHITE = 0x00FFFFFF;
 
-/**
- * Factory class for {@see Logger}
- */
 export default class LoggerFactory {
 	[Symbol.toStringTag] = 'LoggerFactory';
-	/**
-	 * Current logging level
-	 */
-	logLevel = 'with-warnings';
+	logLevels = LEVELS;
 	worker;
 
-	/**
-	 * @return Single log function that can be called, e.g. getSingleLogger(...)('hello world')
-	 * @param initiator - badge string, that every log will be marked with
-	 * @param style - css style, e.g. `font-size: 10px; border-color: red`
-	 * @param fn - bound function that will be called eventually, e.g. console.log
-	 * @param minLevel - initial logging level, .e.g 2
-	 */
-	getSingleLogger(initiator, style, fn, minLevel = 'with-warnings') {
-		return (...outerArgs) => {
-			if (this.logLevel > minLevel) {
-				return () => {
-				};
-			}
-
-			const params = [console, `%c${ initiator }`, style, ...outerArgs];
-
-			if (this.worker) {
-				this.worker.postMessage({
-					source: initiator,
-					arguments: JSON.stringify(outerArgs),
-					level: fn.name,
-				});
-			}
-
-			return Function.prototype.bind.apply(fn, params);
-		};
-	}
-
-	/**
-	 * @return a logger object
-	 * @param clazz - class for which this logger will be created;
-	 */
 	getLogger(clazz) {
 		const style = LoggerFactory.getColorStyle(LoggerFactory.classToColor(clazz));
-
-		return {
-			trace: this.getSingleLogger(
-				clazz.name, style, console.trace, 'trace'),
-			debug: this.getSingleLogger(
-				clazz.name, style, console.debug, 'debug'),
-			log: this.getSingleLogger(
-				clazz.name, style, console.log, 'log'),
-			warn: this.getSingleLogger(
-				clazz.name, style, console.warn, 'warn'),
-			error: this.getSingleLogger(
-				clazz.name, style, console.error, 'error'),
-		};
+		return new LoggerService(clazz, style, this.logLevels, this.worker);
 	}
 
 	setEndpoint(handler) {
@@ -81,20 +30,16 @@ export default class LoggerFactory {
 			throw Error(`Invalid log level ${ logLevel },  allowed levels:  ${ JSON.stringify(LEVELS) }`);
 		}
 
-		this.logLevel = logLevel;
+		this.logLevels = LEVELS.splice(LEVELS.indexOf(logLevel), LEVELS.length - 1);
 	}
 
-	/**
-	 * @return css for badge
-	 * @param color - css color, e.g. #FFFAAA
-	 */
 	static getColorStyle(color) {
 		return `color: white; background-color: ${
 			color }; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
 	}
 
 	static classToColor(clazz) {
-		let color = '#FFFFFF',
+		let color = '#ffffff',
 			hash = 0,
 			i = 0;
 		const len = clazz.name.length;
@@ -112,5 +57,102 @@ export default class LoggerFactory {
 
 	static createWorker(fn) {
 		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${ fn }`])));
+	}
+}
+
+
+class LoggerService {
+	[Symbol.toStringTag] = 'LoggerService';
+
+	clazz;
+	style;
+	logLevels;
+	worker;
+
+	constructor(clazz, style, logLevels, worker) {
+		this.clazz = clazz;
+		this.style = style;
+		this.logLevels = logLevels;
+		this.worker = worker;
+	}
+
+	get trace() {
+		if (!this.logLevels.includes('trace')) {
+			return () => {};
+		}
+
+		if (this.worker) {
+			return (...args) => {
+				LoggerService.postMessage(this.worker, this.clazz, 'trace', ...args);
+			};
+		}
+
+		return console.trace.bind(window.console, `%c TRACE: ${ this.clazz.name }`, this.style);
+	}
+
+	get debug() {
+		if (!this.logLevels.includes('debug')) {
+			return () => {};
+		}
+
+		if (this.worker) {
+			return (...args) => {
+				LoggerService.postMessage(this.worker, this.clazz, 'debug', ...args);
+			};
+		}
+
+		return console.debug.bind(window.console, `%c DEBUG: ${ this.clazz.name }`, this.style);
+	}
+
+	get log() {
+		if (!this.logLevels.includes('log')) {
+			return () => {};
+		}
+
+		if (this.worker) {
+			return (...args) => {
+				LoggerService.postMessage(this.worker, this.clazz, 'log', ...args);
+			};
+		}
+
+		return console.log.bind(window.console, `%c LOG: ${ this.clazz.name }`, this.style);
+	}
+
+	get warn() {
+		if (!this.logLevels.includes('warn')) {
+			return () => {};
+		}
+
+		if (this.worker) {
+			return (...args) => {
+				LoggerService.postMessage(this.worker, this.clazz, 'warn', ...args);
+			};
+		}
+
+		return console.warn.bind(window.console, `%c WARN: ${ this.clazz.name }`, this.style);
+	}
+
+	get error() {
+		if (!this.logLevels.includes('error')) {
+			return () => {};
+		}
+
+		if (this.worker) {
+			return (...args) => {
+				LoggerService.postMessage(this.worker, this.clazz, 'error', ...args);
+			};
+		}
+
+		return console.error.bind(window.console, `%c ERROR: ${ this.clazz.name }`, this.style);
+	}
+
+	static postMessage(worker, clazz, level, ...args) {
+		if (worker) {
+			worker.postMessage({
+				source: clazz.name,
+				arguments: JSON.stringify(args),
+				level: level,
+			});
+		}
 	}
 }

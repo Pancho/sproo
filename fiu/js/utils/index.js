@@ -1,4 +1,5 @@
 import {uniqueBy} from './array.js';
+import {getCookie, removeCookie, setCookie} from './cookie.js'
 import CssStatic from './css.js';
 import debounce from './debounce.js';
 import DeepProxy from './deepproxy.js';
@@ -10,6 +11,7 @@ import uuid from './uuid.js';
 
 export default {
 	uniqueBy: uniqueBy,
+	getCookie, removeCookie, setCookie,
 	CssStatic,
 	debounce,
 	DeepProxy,
