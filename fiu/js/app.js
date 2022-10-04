@@ -90,10 +90,8 @@ export default class App {
 					);
 
 					if (Array.isArray(config.onAppReady)) {
-						config.onAppReady.forEach((fn) => fn(this));
+						Promise.all(config.onAppReady.map((fn) => fn(this))).then(resolve);
 					}
-
-					resolve();
 				},
 			);
 		});
