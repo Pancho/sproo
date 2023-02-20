@@ -12,23 +12,15 @@ export default class Http {
 			throw new Error('Only one instance of Http allowed');
 		}
 
-		if (typeof httpEndpointStub === 'undefined') {
-			throw new Error(`You cannot have a Http instance without providing a stub
-			(stem, first part, http://www.example.com/api/v1/or/something) from which we build the rest of the URL to hit`);
-		}
-
 		Http.instance = this;
 
-		if (httpEndpointStub) {
-			this.httpEndpointStub = `${ window.location.protocol }//${ window.location.host }${
-				httpEndpointStub.endsWith('/') ? httpEndpointStub.slice(0, -1) : httpEndpointStub
-			}`;
-			this.authentication = authentication;
+		if (Http.isValidUrl(httpEndpointStub)) {
+				this.httpEndpointStub = httpEndpointStub;
 		} else {
-			this.httpEndpointStub = `${ window.location.protocol }//${ window.location.host }`;
-			this.authentication = authentication;
+			this.httpEndpointStub = `${ window.location.protocol }//${ window.location.host }${
+				httpEndpointStub ? httpEndpointStub.endsWith('/') ? httpEndpointStub.slice(0, -1) : httpEndpointStub : ''
+			}`;
 		}
-
 		this.authentication = authentication;
 	}
 
@@ -149,5 +141,17 @@ export default class Http {
 		}
 
 		return window.fetch(url, options);
+	}
+
+	static isValidUrl(urlString) {
+		let url;
+
+		try {
+			url = new URL(urlString)
+		} catch (e) {
+			return false;
+		}
+
+		return ['http:', 'https:'].includes(url.protocol);
 	}
 }
