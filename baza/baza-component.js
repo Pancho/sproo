@@ -1,11 +1,11 @@
-import Component from '../fiu/js/component.js';
-import utils from '../fiu/js/utils/index.js';
+import Component from '../sproo/js/component.js';
+import utils from '../sproo/js/utils/index.js';
 
 /**
  * @class BazaComponent
  * @extends Component
  *
- * This class extends the fiu base Component class and adds a way to inject a path to custom CSS file
+ * This class extends the sproo base Component class and adds a way to inject a path to custom CSS file
  * via style-path attribute on the component element in the template.
  *
  * This is convenient for the baza components that strive to be generic, so if we must set templates

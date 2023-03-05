@@ -33,7 +33,7 @@ export default class App {
 				styleSheetPromises.push(new Promise(
 					(resolve) => {
 						utils.Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
-					}
+					},
 				));
 			});
 		}
@@ -91,6 +91,8 @@ export default class App {
 
 					if (Array.isArray(config.onAppReady)) {
 						Promise.all(config.onAppReady.map((fn) => fn(this))).then(resolve);
+					} else {
+						resolve();
 					}
 				},
 			);

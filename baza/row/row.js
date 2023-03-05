@@ -1,4 +1,4 @@
-import utils from '../../fiu/js/utils/index.js';
+import utils from '../../sproo/js/utils/index.js';
 import BazaComponent from '../baza-component.js';
 
 const html = new utils.HtmlStatic(`<slot></slot>`),
@@ -9,8 +9,8 @@ export default class BazaRowComponent extends BazaComponent {
 	static tagName = 'baza-row';
 	static template = html;
 	static stylesheets = [
-		'/fiu/css/meta',
-		'/fiu/css/normalize',
+		'/sproo/css/meta',
+		'/sproo/css/normalize',
 		css,
 	];
 	static registerComponents = [];

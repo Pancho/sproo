@@ -1,9 +1,9 @@
-import utils from '../../fiu/js/utils/index.js';
+import utils from '../../sproo/js/utils/index.js';
 import BazaComponent from '../baza-component.js';
 
 /** @const {utils.HtmlStatic} [HTML static template, so we don't load it from another file] */
 const html = new utils.HtmlStatic(`<header>
-	<h1 fiu-ref="titleElement"></h1>
+	<h1 ref="titleElement"></h1>
 </header>
 <main>
 	<slot></slot>
@@ -28,8 +28,8 @@ class BazaCardComponent extends BazaComponent {
 	static tagName = 'baza-card';
 	static template = html;
 	static stylesheets = [
-		'/fiu/css/meta',
-		'/fiu/css/normalize',
+		'/sproo/css/meta',
+		'/sproo/css/normalize',
 		css,
 	];
 	static registerComponents = [];

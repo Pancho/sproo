@@ -1,3 +1,3 @@
-# fiu
+# Sproo
 
-A WebComponent framework consisting of only a fiu files. NPM be damned.
+A WebComponent framework consisting of only a few files. NPM be damned.

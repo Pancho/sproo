@@ -61,6 +61,14 @@ export default class Component extends HTMLElement {
 
 		if (App.loggerFactory) {
 			this.logger = App.loggerFactory.getLogger(this.constructor);
+		} else {
+			this.logger = new Proxy({}, {
+				get: function (target, name) {
+					return function () {
+						throw new Error('To use logging (this.logger) you must setup logging (loggerConfig) in your App config');
+					};
+				},
+			});
 		}
 
 		this.templateLoaded = new Promise((resolve) => {
@@ -76,7 +84,7 @@ export default class Component extends HTMLElement {
 				Object.getOwnPropertyNames(this)
 					.filter((name) => !baseProperties.includes(name))
 					.forEach(function (name) {
-						const internalName = `fiuInternal-${ name }`;
+						const internalName = `sprooInternal-${ name }`;
 
 						initialContext[name] = obj[name];
 						Object.defineProperty(obj, internalName, {
@@ -242,8 +250,8 @@ export default class Component extends HTMLElement {
 
 	static parseReferences(component, templateDocument) {
 		templateDocument.querySelectorAll('*').forEach((refElement) => {
-			if (refElement.getAttribute('fiu-ref')) {
-				component[refElement.getAttribute('fiu-ref')] = refElement;
+			if (refElement.getAttribute('ref')) {
+				component[refElement.getAttribute('ref')] = refElement;
 			}
 		});
 	}
@@ -272,8 +280,8 @@ export default class Component extends HTMLElement {
 
 							if (refElement.closest('[for-each-data]')) {
 								refElement.eventListeners[eventName] = (ev) => {
-									const fiuData = ev.target.closest('[for-each-data]').fiu,
-										result = component[attributeValue](ev, fiuData);
+									const sprooData = ev.target.closest('[for-each-data]').sproo,
+										result = component[attributeValue](ev, sprooData);
 
 									if (result === false) {
 										ev.preventDefault();
@@ -305,7 +313,7 @@ export default class Component extends HTMLElement {
 		// Console.time(`Process Template ${ templateDocument }`);
 		Component.parseIf(component, parent, owner, templateDocument);
 		Component.parseForEach(component, parent, owner, templateDocument);
-		Component.parseFiuAttributes(component, parent, owner, templateDocument);
+		Component.parseSprooAttributes(component, parent, owner, templateDocument);
 		Component.parseEventHandlers(component, templateDocument);
 
 		if (parent) {
@@ -331,7 +339,7 @@ export default class Component extends HTMLElement {
 
 			const attributeValue = refElement.getAttribute('if'),
 				clone = document.importNode(refElement, true),
-				ifElement = document.createElement('fiu-if');
+				ifElement = document.createElement('sproo-if');
 
 			if (!owner.ifIndex[attributeValue]) {
 				owner.ifIndex[attributeValue] = [];
@@ -358,7 +366,7 @@ export default class Component extends HTMLElement {
 			}
 
 			const template = document.importNode(refElement, true),
-				forElement = document.createElement('fiu-for-each'),
+				forElement = document.createElement('sproo-for-each'),
 				split = refElement.getAttribute('for-each').split(' in '),
 				itemName = split[0].trim(),
 				itemsName = split[1].trim(),
@@ -387,7 +395,7 @@ export default class Component extends HTMLElement {
 		});
 	}
 
-	static parseFiuAttributes(component, parent, owner, templateDocument) {
+	static parseSprooAttributes(component, parent, owner, templateDocument) {
 		const iter = document.createNodeIterator(templateDocument, NodeFilter.SHOW_TEXT);
 		let textNode = iter.nextNode();
 
@@ -498,10 +506,10 @@ export default class Component extends HTMLElement {
 				while (forElement.previousElementSibling) {
 					const clone = document.importNode(forElement.previousElementSibling, true);
 
-					clone.fiu = forElement.previousElementSibling.fiu;
+					clone.sproo = forElement.previousElementSibling.sproo;
 					documentFragment.prepend(clone);
 					clonedKeyElementMapping.set(
-						keyIdentifier.split('.').reduce((previous, current) => previous[current], clone.fiu),
+						keyIdentifier.split('.').reduce((previous, current) => previous[current], clone.sproo),
 						clone,
 					);
 					parentElement.removeChild(forElement.previousElementSibling);
@@ -566,7 +574,7 @@ export default class Component extends HTMLElement {
 						[itemName]: items[addIndex],
 						index: addIndex,
 					});
-					template.fiu = items[addIndex];
+					template.sproo = items[addIndex];
 					anchor.after(template);
 					clonedKeyElementMapping.set(keys[addIndex], template);
 				});
@@ -592,7 +600,7 @@ export default class Component extends HTMLElement {
 						[itemName]: item,
 						index: index,
 					});
-					template.fiu = item;
+					template.sproo = item;
 					documentFragment.appendChild(template);
 				});
 			}

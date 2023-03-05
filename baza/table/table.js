@@ -1,14 +1,14 @@
-import utils from '../../fiu/js/utils/index.js';
+import utils from '../../sproo/js/utils/index.js';
 import BazaComponent from '../baza-component.js';
 
 const html = new utils.HtmlStatic(`<table>
-	<thead fiu-ref="thead"></thead>
-	<tbody fiu-ref="tbody">
+	<thead ref="thead"></thead>
+	<tbody ref="tbody">
 		<tr for-each="row in internalData" for-key="0">
 			<td for-each="column in row">{{ column }}</td>
 		</tr>
 	</tbody>
-	<tfoot fiu-ref="tfoot"></tfoot>
+	<tfoot ref="tfoot"></tfoot>
 </table>`),
 	css = new utils.CssStatic(`:host {display:flex;}`);
 
@@ -16,8 +16,8 @@ export default class BazaTableComponent extends BazaComponent {
 	static tagName = 'baza-table';
 	static template = html;
 	static stylesheets = [
-		'/fiu/css/meta',
-		'/fiu/css/normalize',
+		'/sproo/css/meta',
+		'/sproo/css/normalize',
 		css,
 	];
 	internalHeaders = [];

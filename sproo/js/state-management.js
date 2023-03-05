@@ -46,7 +46,7 @@ class State extends BehaviorSubject {
 
 export default class Store extends Observable {
 	[Symbol.toStringTag] = 'Store';
-	static STORE_KEY = 'fiu/store';
+	static STORE_KEY = 'sproo/store';
 	persistence;
 	store;
 	slice;

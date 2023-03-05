@@ -35,24 +35,20 @@ export default class Router {
 			routes.forEach((route) => {
 				this.add(
 					route.path,
-					(params) => {
+					async (params) => {
 						const componentParams = params || [];
 
 						if (route.guard) {
-							return import(route.guard).then((guardModule) => {
-								const guard = new guardModule.default(this, route);
+							const guardModule = await import(route.guard),
+								guard = new guardModule.default(this, route),
+							guardResult = await guard.guard(this, route);
 
-								return guard.guard(this, route).then((result) => {
-									if (result) {
-										return RouterUtils.inject(route.component, ...componentParams);
-									}
-
-									return false;
-								});
-							});
+							if (guardResult) {
+								await RouterUtils.inject(route.component, ...componentParams);
+							}
 						}
 
-						return RouterUtils.inject(route.component, ...componentParams);
+						await RouterUtils.inject(route.component, ...componentParams);
 					},
 				);
 			});
@@ -81,21 +77,21 @@ export default class Router {
 		});
 	}
 
-	navigate(location, data) {
+	async navigate(location, data) {
 		const internalData = data || {},
 			internalLocation = location || '';
 
 		window.history.pushState(
 			internalData,
-			// Here's the thing about this param... this would replace the title tag, so each page could have a unique
-			// Title, but of all the browsers, only Safari uses this, and I don't want to test it, to see if this is
-			// Even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
-			// For the SEO anyway.
+			/* Here's the thing about this param... this would replace the title tag, so each page could have a unique
+			title, but of all the browsers, only Safari uses this, and I don't want to test it, to see if this is
+			even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
+			for the SEO anyway. */
 			'',
 			`${ this.routeRoot }/${ internalLocation.replace(RouterUtils.CLEAN_LEADING_SLASH, '/') }`.replace(/([^:])(\/{2,})/gu, '$1/'),
 		);
 
-		return this.resolve();
+		await this.resolve();
 	}
 
 	match(path) {
@@ -113,16 +109,16 @@ export default class Router {
 					route: route,
 					params: params,
 				} : false;
-			}).filter((match) => match)[0];
+			}).filter(Boolean)[0];
 	}
 
-	resolve(current) {
+	async resolve(current) {
 		const url = current || RouterUtils.clean(window.location.href),
 			path = RouterUtils.splitURL(url.replace(this.routeRoot, '')),
 			match = this.match(path);
 
 		if (Boolean(this.lastRouteResolved) && this.lastRouteResolved.path === path) {
-			return false;
+			return;
 		}
 
 		if (match) {
@@ -130,19 +126,16 @@ export default class Router {
 				path: path,
 				params: match.params,
 			};
-
-			return match.route.handler(match.params);
+			await match.route.handler(match.params);
 		} else if (Boolean(this.homePageRoute) && (path === '' || path === '/')) {
 			this.lastRouteResolved = {path: path};
 
-			return this.homePageRoute.handler();
+			await this.homePageRoute.handler();
 		} else if (this.notFoundRoute) {
 			this.lastRouteResolved = {path: path};
 
-			return this.notFoundRoute.handler();
+			await this.notFoundRoute.handler();
 		}
-
-		return false;
 	}
 }
 
@@ -209,8 +202,9 @@ class RouterUtils {
 			}, null);
 	}
 
-	static inject(component, ...params) {
-		const outlet = document.querySelector('router-outlet');
+	static async inject(component, ...params) {
+		const outlet = document.querySelector('router-outlet'),
+			module = await import(component);
 
 		if (!outlet) {
 			throw new Error('Page must contain <router-outlet> element');
@@ -224,21 +218,14 @@ class RouterUtils {
 			outlet.removeChild(outlet.firstChild);
 		}
 
-		return new Promise((resolve) => {
-			import(component).then((module) => {
-				if (!module || !module.default) {
-					throw new Error(`We cannot render a component from module ${ module }`);
-				}
+		if (!module || !module.default) {
+			throw new Error(`We cannot render a component from module ${ module }`);
+		}
 
-				if (!customElements.get(module.default.tagName)) {
-					customElements.define(module.default.tagName, module.default);
-				}
+		if (!customElements.get(module.default.tagName)) {
+			customElements.define(module.default.tagName, module.default);
+		}
 
-				outlet.appendChild(new module.default(...params));
-				resolve();
-			}).catch((error) => {
-				throw new Error(error);
-			});
-		});
+		outlet.appendChild(new module.default(...params));
 	}
 }
