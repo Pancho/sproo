@@ -41,7 +41,7 @@ export default class Router {
 						if (route.guard) {
 							const guardModule = await import(route.guard),
 								guard = new guardModule.default(this, route),
-							guardResult = await guard.guard(this, route);
+								guardResult = await guard.guard(this, route);
 
 							if (guardResult) {
 								await RouterUtils.inject(route.component, ...componentParams);

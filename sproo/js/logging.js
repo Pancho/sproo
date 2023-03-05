@@ -14,6 +14,7 @@ export default class LoggerFactory {
 
 	getLogger(clazz) {
 		const style = LoggerFactory.getColorStyle(LoggerFactory.classToColor(clazz));
+
 		return new LoggerService(clazz, style, this.logLevels, this.worker);
 	}
 

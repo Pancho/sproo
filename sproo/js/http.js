@@ -15,12 +15,21 @@ export default class Http {
 		Http.instance = this;
 
 		if (Http.isValidUrl(httpEndpointStub)) {
-				this.httpEndpointStub = httpEndpointStub;
+			this.httpEndpointStub = httpEndpointStub;
 		} else {
-			this.httpEndpointStub = `${ window.location.protocol }//${ window.location.host }${
-				httpEndpointStub ? httpEndpointStub.endsWith('/') ? httpEndpointStub.slice(0, -1) : httpEndpointStub : ''
-			}`;
+			let endpoint = '';
+
+			if (httpEndpointStub) {
+				if (httpEndpointStub.endsWith('/')) {
+					endpoint = httpEndpointStub.slice(0, -1);
+				} else {
+					endpoint = httpEndpointStub;
+				}
+			}
+
+			this.httpEndpointStub = `${ window.location.protocol }//${ window.location.host }${ endpoint }`;
 		}
+
 		this.authentication = authentication;
 	}
 
@@ -144,10 +153,10 @@ export default class Http {
 	}
 
 	static isValidUrl(urlString) {
-		let url;
+		let url = null;
 
 		try {
-			url = new URL(urlString)
+			url = new URL(urlString);
 		} catch (e) {
 			return false;
 		}

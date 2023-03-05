@@ -63,7 +63,7 @@ export default class Component extends HTMLElement {
 			this.logger = App.loggerFactory.getLogger(this.constructor);
 		} else {
 			this.logger = new Proxy({}, {
-				get: function (target, name) {
+				get: function () {
 					return function () {
 						throw new Error('To use logging (this.logger) you must setup logging (loggerConfig) in your App config');
 					};
@@ -637,10 +637,15 @@ export default class Component extends HTMLElement {
 					const extractedValue = selectorKey.split('.').slice(1).reduce((previous, current) => previous[current], value);
 
 					if (Component.isObject(extractedValue)) {
-						Component.processForEach(component, parent, owner, selectorKey, Object.entries(extractedValue).map(([forKey, forValue]) => ({
-							key: forKey,
-							value: forValue,
-						})), owner.templateContext);
+						Component.processForEach(
+							component,
+							parent,
+							owner,
+							selectorKey,
+							Object.entries(extractedValue).map(([forKey, forValue]) => ({
+								key: forKey,
+								value: forValue,
+							})), owner.templateContext);
 					} else if (Array.isArray(extractedValue)) {
 						Component.processForEach(component, parent, owner, selectorKey, extractedValue, owner.templateContext);
 					}

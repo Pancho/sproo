@@ -1,5 +1,5 @@
 import {uniqueBy} from './array.js';
-import {getCookie, removeCookie, setCookie} from './cookie.js'
+import {getCookie, removeCookie, setCookie} from './cookie.js';
 import CssStatic from './css.js';
 import debounce from './debounce.js';
 import DeepProxy from './deepproxy.js';
