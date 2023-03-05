@@ -36,3 +36,4 @@ tests
 nginx
 docker-compose.yml
 baza/todo
+palette.css
