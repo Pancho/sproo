@@ -315,6 +315,7 @@ export default class Component extends HTMLElement {
 		Component.parseForEach(component, parent, owner, templateDocument);
 		Component.parseSprooAttributes(component, parent, owner, templateDocument);
 		Component.parseEventHandlers(component, templateDocument);
+		Component.parseReferences(component, templateDocument);
 
 		if (parent) {
 			if (!parent.childBlocks) {
@@ -700,10 +701,6 @@ export default class Component extends HTMLElement {
 
 			return `${ key }.${ innerKey }`;
 		});
-	}
-
-	static isInChildBlock(refElement) {
-		return Boolean(refElement.closest('[for-each]')) || Boolean(refElement.closest('[if]'));
 	}
 
 	static isObject(obj) {
