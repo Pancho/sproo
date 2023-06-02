@@ -99,7 +99,7 @@ export default class Component extends HTMLElement {
 							set: function (value) {
 								let setValue = value;
 
-								if (componentReady && typeof setValue === 'object') {
+								if (componentReady && typeof setValue === 'object' && !(setValue instanceof Element)) {
 									setValue = Component.newDeepProxy(setValue, name, obj);
 								}
 
