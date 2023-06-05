@@ -1,5 +1,5 @@
 import Router from './router.js';
-import utils from './utils/index.js';
+import Loader from './utils/loader.js';
 
 
 export default class App {
@@ -32,7 +32,7 @@ export default class App {
 			config.rootStylesheets.forEach((stylesheet) => {
 				styleSheetPromises.push(new Promise(
 					(resolve) => {
-						utils.Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
+						Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
 					},
 				));
 			});

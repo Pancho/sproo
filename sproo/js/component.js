@@ -1,5 +1,7 @@
 import App from './app.js';
-import utils from './utils/index.js';
+import DeepProxy from './utils/deepproxy.js';
+import Loader from './utils/loader.js';
+import {uniqueBy} from './utils/array.js';
 
 
 const CLEAN_TRAILING_SLASH = /\/+$/u,
@@ -33,7 +35,7 @@ export default class Component extends HTMLElement {
 		const importPromises = [],
 			templateReady = new Promise((resolve) => {
 				if (this.constructor.template) {
-					utils.Loader.getTemplateHTML(this.constructor.template, resolve);
+					Loader.getTemplateHTML(this.constructor.template, resolve);
 				} else {
 					resolve();
 				}
@@ -45,7 +47,7 @@ export default class Component extends HTMLElement {
 			this.constructor.stylesheets.forEach((stylesheet) => {
 				styleSheetPromises.push(
 					new Promise((resolve) => {
-						utils.Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
+						Loader.getCSS(typeof stylesheet === 'string' ? `${App.staticRoot}${stylesheet}` : stylesheet, resolve);
 					}),
 				);
 			});
@@ -84,7 +86,7 @@ export default class Component extends HTMLElement {
 				Object.getOwnPropertyNames(this)
 					.filter((name) => !baseProperties.includes(name))
 					.forEach(function (name) {
-						const internalName = `sprooInternal-${ name }`;
+						const internalName = `sprooInternal-${name}`;
 
 						initialContext[name] = obj[name];
 						Object.defineProperty(obj, internalName, {
@@ -114,7 +116,7 @@ export default class Component extends HTMLElement {
 							return false;
 						}
 
-						obj[name] = new utils.DeepProxy(obj[name], {
+						obj[name] = new DeepProxy(obj[name], {
 							set(target, property) {
 								if (Array.isArray(obj[internalName]) && property.includes('length')) {
 									Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: obj[internalName]});
@@ -301,7 +303,7 @@ export default class Component extends HTMLElement {
 
 							refElement.addEventListener(eventName, refElement.eventListeners[eventName]);
 						} else {
-							console.warn(`Handler ${ attributeValue } not present on component`);
+							console.warn(`Handler ${attributeValue} not present on component`);
 						}
 					}
 				});
@@ -460,7 +462,7 @@ export default class Component extends HTMLElement {
 			if (value) {
 				if (!entry.template.parentElement) {
 					// We'll just clean the removed "if" element form the index, as it will get recreated if needed again.
-					owner.ifIndex[key] = utils.uniqueBy(owner.ifIndex[key], (item) => item.ifElement);
+					owner.ifIndex[key] = uniqueBy(owner.ifIndex[key], (item) => item.ifElement);
 
 					template.bindingIndex = {};
 					template.ifIndex = {};
@@ -613,7 +615,7 @@ export default class Component extends HTMLElement {
 	static setContext(component, parent, owner, templateDocument, change) {
 		// Console.time(`Set context ${templateDocument}`);
 		if (!Component.isObject(change)) {
-			throw Error(`Context has to be updated with an object. Got ${ change }`);
+			throw Error(`Context has to be updated with an object. Got ${change}`);
 		}
 
 		owner.templateContext = {
@@ -661,7 +663,7 @@ export default class Component extends HTMLElement {
 							textNode.textContent = boundValue;
 						});
 					} else {
-						templateDocument.querySelectorAll(`[\\[${ targetSelection }\\]="${ selectorKey }"]`).forEach((elm) => {
+						templateDocument.querySelectorAll(`[\\[${targetSelection}\\]="${selectorKey}"]`).forEach((elm) => {
 							if (targetSelection.includes('.')) {
 								const split = targetSelection.split('\\.');
 
@@ -693,13 +695,13 @@ export default class Component extends HTMLElement {
 		return Object.keys(value).map((innerKey) => {
 			if (Component.isObject(value[innerKey])) {
 				return [
-					`${ key }.${ innerKey }`, Component.spreadPath(innerKey, value[innerKey]).map(
-						(newKey) => `${ key }.${ newKey }`,
+					`${key}.${innerKey}`, Component.spreadPath(innerKey, value[innerKey]).map(
+						(newKey) => `${key}.${newKey}`,
 					),
 				].flat();
 			}
 
-			return `${ key }.${ innerKey }`;
+			return `${key}.${innerKey}`;
 		});
 	}
 
@@ -708,7 +710,7 @@ export default class Component extends HTMLElement {
 	}
 
 	static newDeepProxy(value, name, obj) {
-		return new utils.DeepProxy(value, {
+		return new DeepProxy(value, {
 			set: function (target, property) {
 				if (Array.isArray(value) && property.includes('length')) {
 					Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: value});
