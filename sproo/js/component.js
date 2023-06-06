@@ -711,12 +711,8 @@ export default class Component extends HTMLElement {
 
 	static newDeepProxy(value, name, obj) {
 		return new DeepProxy(value, {
-			set: function (target, property) {
-				if (Array.isArray(value) && property.includes('length')) {
-					Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: value});
-				} else {
-					Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: value});
-				}
+			set: function () {
+				Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: value});
 			},
 		}).proxy;
 	}
