@@ -15,7 +15,7 @@ export default class Router {
 
 		Router.instance = this;
 
-		this.routeRoot = `${ window.location.protocol }//${ window.location.host }${ routeRoot }`;
+		this.routeRoot = `${window.location.protocol}//${window.location.host}${routeRoot}`;
 		this.authenticationUrl = authenticationUrl;
 
 		window.addEventListener('popstate', (state) => this.resolve(state.target.location.href));
@@ -78,7 +78,10 @@ export default class Router {
 	}
 
 	async navigate(location, data) {
-		const internalData = data || {},
+		const internalData = {
+				previousUrl: window.location.href.replace(window.location.origin, ''),
+				...data,
+			},
 			internalLocation = location || '';
 
 		window.history.pushState(
@@ -88,7 +91,7 @@ export default class Router {
 			even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
 			for the SEO anyway. */
 			'',
-			`${ this.routeRoot }/${ internalLocation.replace(RouterUtils.CLEAN_LEADING_SLASH, '/') }`.replace(/([^:])(\/{2,})/gu, '$1/'),
+			`${this.routeRoot}/${internalLocation.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')}`.replace(/([^:])(\/{2,})/gu, '$1/'),
 		);
 
 		await this.resolve();
@@ -205,21 +208,24 @@ class RouterUtils {
 	static async inject(component, ...params) {
 		const outlet = document.querySelector('router-outlet'),
 			module = await import(component);
+		let element = outlet.firstChild;
 
 		if (!outlet) {
 			throw new Error('Page must contain <router-outlet> element');
 		}
 
-		while (outlet.firstChild) {
-			if (outlet.firstChild.unload) {
-				outlet.firstChild.unload();
+		while (element) {
+			if (element.unloadComponent) {
+				element.unloadComponent();
 			}
 
 			outlet.removeChild(outlet.firstChild);
+
+			element = outlet.firstChild;
 		}
 
 		if (!module || !module.default) {
-			throw new Error(`We cannot render a component from module ${ module }`);
+			throw new Error(`We cannot render a component from module ${module}`);
 		}
 
 		if (!customElements.get(module.default.tagName)) {

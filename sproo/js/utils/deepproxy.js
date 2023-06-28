@@ -21,7 +21,7 @@ export default class DeepProxy {
 
 	wrap(obj, path) {
 		for (const key of Object.keys(obj)) {
-			if (typeof obj[key] === 'object') {
+			if (!!obj[key] && typeof obj[key] === 'object') {
 				obj[key] = this.wrap(obj[key], [...path, key]);
 			}
 		}
@@ -40,7 +40,7 @@ export default class DeepProxy {
 			set(target, property, value, receiver) {
 				let handlerValue = value;
 
-				if (typeof value === 'object') {
+				if (!!value && typeof value === 'object') {
 					handlerValue = deepProxy.wrap(value, [...path, property]);
 				}
 

@@ -172,7 +172,7 @@ export default class Component extends HTMLElement {
 							location
 								.replace(CLEAN_TRAILING_SLASH, '')
 								.replace(CLEAN_LEADING_SLASH, '/'),
-							{...target.dataset}, // "cast" to dict
+							{prevUrl: window.location.href, ...target.dataset}, // "cast" to dict
 						);
 					}
 
@@ -182,6 +182,15 @@ export default class Component extends HTMLElement {
 
 			return false; // Do not allow the click to the element actually do anything
 		});
+	}
+
+	unloadComponent() {
+		Array.from(this.getElements('*'))
+			.filter((element) => element instanceof Component)
+			.forEach((component) => {
+				component.unloadComponent();
+			});
+		this.unload();
 	}
 
 	unload() {
@@ -711,8 +720,12 @@ export default class Component extends HTMLElement {
 
 	static newDeepProxy(value, name, obj) {
 		return new DeepProxy(value, {
-			set: function () {
-				Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: value});
+			set: function (target, property) {
+				if (Array.isArray(value) && property.includes('length')) {
+					Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: value});
+				} else {
+					Component.setContext(obj, null, obj, obj.shadowRoot, {[name]: value});
+				}
 			},
 		}).proxy;
 	}
