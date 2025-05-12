@@ -7,6 +7,7 @@ export default class Router {
 	homePageRoute = null;
 	notFoundRoute = null;
 	destroyed = false;
+	#onPopStateBound = null;
 
 	constructor(routeRoot, homePage, notFound, routes, authenticationUrl) {
 		if (Router.instance) {
@@ -15,20 +16,23 @@ export default class Router {
 
 		Router.instance = this;
 
-		this.routeRoot = `${window.location.protocol}//${window.location.host}${routeRoot}`;
+		this.routeRoot = `${ window.location.protocol }//${ window.location.host }${ routeRoot }`;
 		this.authenticationUrl = authenticationUrl;
 
-		window.addEventListener('popstate', (state) => this.resolve(state.target.location.href));
+		this.#onPopStateBound = this.#onPopState.bind(this);
+		window.addEventListener('popstate', this.#onPopStateBound);
 
 		this.homePageRoute = {
 			handler: async () => {
 				await RouterUtils.inject(homePage.component);
 			},
+			meta: homePage.meta,
 		};
 		this.notFoundRoute = {
 			handler: async () => {
 				await RouterUtils.inject(notFound.component);
 			},
+			meta: notFound.meta,
 		};
 
 		if (Array.isArray(routes)) {
@@ -46,10 +50,11 @@ export default class Router {
 							if (guardResult) {
 								await RouterUtils.inject(route.component, ...componentParams);
 							}
+						} else {
+							await RouterUtils.inject(route.component, ...componentParams);
 						}
-
-						await RouterUtils.inject(route.component, ...componentParams);
 					},
+					route.meta,
 				);
 			});
 		}
@@ -61,10 +66,10 @@ export default class Router {
 		this.routes = [];
 		this.destroyed = true;
 
-		window.removeEventListener('popstate', (state) => this.resolve(state.target.location.href));
+		window.removeEventListener('popstate', this.#onPopStateBound);
 	}
 
-	add(route, handler = null) {
+	add(route, handler = null, meta = null) {
 		let internalRoute = '';
 
 		if (typeof route === 'string') {
@@ -74,6 +79,7 @@ export default class Router {
 		this.routes.push({
 			path: internalRoute,
 			handler: handler,
+			meta: meta,
 		});
 	}
 
@@ -88,37 +94,38 @@ export default class Router {
 			internalData,
 			/* Here's the thing about this param... this would replace the title tag, so each page could have a unique
 			title, but of all the browsers, only Safari uses this, and I don't want to test it, to see if this is
-			even worth keeping. Just give your page a decent name in the title tag, because this is poorly optimized
-			for the SEO anyway. */
+			even worth keeping. You can add meta.title param to your routes to set the page title (if not, it inherits the <meta><title>
+			from the index.html document). */
 			'',
-			`${this.routeRoot}/${internalLocation.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')}`.replace(/([^:])(\/{2,})/gu, '$1/'),
+			`${ this.routeRoot }/${ internalLocation.replace(RouterUtils.CLEAN_LEADING_SLASH, '/') }`.replace(/([^:])(\/{2,})/gu, '$1/'),
 		);
 
 		await this.resolve();
 	}
 
 	match(path) {
-		return this.routes
-			.map((route) => {
-				const {
-						regexp,
-						paramNames,
-					} = RouterUtils.replaceDynamicURLParts(RouterUtils.clean(route.path)),
-					match = path.replace(RouterUtils.CLEAN_LEADING_SLASH, '/').match(regexp),
-					params = RouterUtils.regExpResultToParams(match, paramNames);
+		const cleanedPath = path.replace(RouterUtils.CLEAN_LEADING_SLASH, '/');
 
-				return match ? {
-					match: match,
-					route: route,
-					params: params,
-				} : false;
-			}).filter(Boolean)[0];
+		for (let i = 0, j = this.routes.length; i < j; i += 1) {
+			const route = this.routes[i],
+				{regexp, paramNames} = RouterUtils.replaceDynamicURLParts(RouterUtils.clean(route.path)),
+				match = cleanedPath.match(regexp);
+
+			if (match) {
+				const params = RouterUtils.regExpResultToParams(match, paramNames);
+
+				return {match, route, params};
+			}
+		}
+
+		return null;
 	}
 
 	async resolve(current) {
 		const url = current || RouterUtils.clean(window.location.href),
 			path = RouterUtils.splitURL(url.replace(this.routeRoot, '')),
 			match = this.match(path);
+		let title = null;
 
 		if (Boolean(this.lastRouteResolved) && this.lastRouteResolved.path === path) {
 			return;
@@ -130,15 +137,33 @@ export default class Router {
 				params: match.params,
 			};
 			await match.route.handler(match.params);
-		} else if (Boolean(this.homePageRoute) && (path === '' || path === '/')) {
-			this.lastRouteResolved = {path: path};
 
+			if (match?.route?.meta?.title) {
+				title = match.route.meta.title;
+			}
+		} else if (Boolean(this.homePageRoute) && RouterUtils.clean(path) === '') {
+			this.lastRouteResolved = {path: path};
 			await this.homePageRoute.handler();
+
+			if (this.homePageRoute.meta?.title) {
+				title = this.homePageRoute.meta.title;
+			}
 		} else if (this.notFoundRoute) {
 			this.lastRouteResolved = {path: path};
-
 			await this.notFoundRoute.handler();
+
+			if (this.notFoundRoute.meta?.title) {
+				title = this.notFoundRoute.meta.title;
+			}
 		}
+
+		if (title) {
+			document.title = title;
+		}
+	}
+
+	#onPopState(event) {
+		this.resolve(event.target.location.href);
 	}
 }
 
@@ -153,7 +178,7 @@ class RouterUtils {
 	static FOLLOWED_BY_SLASH_REGEXP = '(?:/$|$)';
 
 	static clean(url) {
-		return url.replace(RouterUtils.CLEAN_TRAILING_SLASH, '').replace(RouterUtils.CLEAN_LEADING_SLASH, '^/').split('#')[0];
+		return url.replace(RouterUtils.CLEAN_TRAILING_SLASH, '').replace(RouterUtils.CLEAN_LEADING_SLASH, '/').split('#')[0];
 	}
 
 	static splitURL(url) {
@@ -206,12 +231,29 @@ class RouterUtils {
 	}
 
 	static async inject(component, ...params) {
-		const outlet = document.querySelector('router-outlet'),
-			module = await import(component);
-		let element = outlet.firstChild;
+		const outlet = document.querySelector('router-outlet');
 
 		if (!outlet) {
 			throw new Error('Page must contain <router-outlet> element');
+		}
+
+		let module = null,
+			element = outlet.firstChild;
+
+		try {
+			module = await import(component);
+		} catch (error) {
+			console.error(`Failed to load module ${ component }:`, error);
+
+			throw error;
+		}
+
+		if (!module?.default) {
+			throw new Error(`Module ${ component } does not have a valid default export.`);
+		}
+
+		if (!customElements.get(module.default.tagName)) {
+			customElements.define(module.default.tagName, module.default);
 		}
 
 		while (element) {
@@ -220,18 +262,13 @@ class RouterUtils {
 			}
 
 			outlet.removeChild(outlet.firstChild);
-
 			element = outlet.firstChild;
 		}
 
-		if (!module || !module.default) {
-			throw new Error(`We cannot render a component from module ${module}`);
+		try {
+			outlet.appendChild(new module.default(...params));
+		} catch (error) {
+			console.error('Error rendering component:', error);
 		}
-
-		if (!customElements.get(module.default.tagName)) {
-			customElements.define(module.default.tagName, module.default);
-		}
-
-		outlet.appendChild(new module.default(...params));
 	}
 }

@@ -8,6 +8,36 @@ export default class Loader {
 	static templateCache = {};
 	static templateQueue = {};
 	static domParser = (new DOMParser);
+	static maxConcurrentFetches = 4;
+	static currentFetches = 0;
+	static fetchQueue = [];
+
+	static #queueFetch(fn) {
+		return new Promise((resolve, reject) => {
+			const run = () => {
+				Loader.currentFetches += 1;
+
+				fn()
+					.then(resolve)
+					.catch(reject)
+					.finally(() => {
+						Loader.currentFetches -= 1;
+
+						if (Loader.fetchQueue.length > 0) {
+							const next = Loader.fetchQueue.shift();
+
+							next();
+						}
+					});
+			};
+
+			if (Loader.currentFetches < Loader.maxConcurrentFetches) {
+				run();
+			} else {
+				Loader.fetchQueue.push(run);
+			}
+		});
+	}
 
 	static getCSS(stylesheetPath, resolve) {
 		const promiseResolve = resolve || function () {
@@ -28,15 +58,27 @@ export default class Loader {
 
 			Loader.cssQueue[stylesheetPath].push(promiseResolve);
 
-			fetch(`${ stylesheetPath.toLowerCase() }.css`, {method: 'GET'}).then((response) => response.text()).then((css) => {
+			Loader.#queueFetch(() => fetch(`${ stylesheetPath.toLowerCase() }.css`, {method: 'GET'}).then((response) => {
+				if (!response.ok) {
+					throw new Error(`Failed to load CSS from ${ stylesheetPath }: ${ response.status } ${ response.statusText }`);
+				}
+
+				return response.text();
+			}).then((css) => {
 				const styleSheet = new CSSStyleSheet;
 
 				styleSheet.replaceSync(css);
 				Loader.cssCache[stylesheetPath] = styleSheet;
 				Loader.cssQueue[stylesheetPath].forEach((queuedResolve) => {
-					queuedResolve(styleSheet);
+					try {
+						queuedResolve(styleSheet);
+					} catch (error) {
+						console.error('Error in queued CSS resolve callback:', error);
+					}
 				});
-			});
+			}).catch((error) => {
+				console.error(`Loader.getCSS error: ${ error.message }`);
+			}));
 		}
 	}
 
@@ -59,14 +101,27 @@ export default class Loader {
 
 			Loader.templateQueue[templatePath].push(promiseResolve);
 
-			fetch(`${ templatePath.toLowerCase() }.html`, {method: 'GET'}).then((response) => response.text()).then((html) => {
-				const node = Loader.domParser.parseFromString(`<template>${ html }</template>`, 'text/html');
+			Loader.#queueFetch(() => fetch(`${ templatePath.toLowerCase() }.html`, {method: 'GET'}).then((response) => {
+				if (!response.ok) {
+					throw new Error(`Failed to load template from ${ templatePath }: ${ response.status } ${ response.statusText }`);
+				}
+
+				return response.text();
+			}).then((html) => {
+				const node = Loader.domParser.parseFromString(`<template>${ html }</template>`, 'text/html'),
+					template = node.querySelector('template');
 
 				Loader.templateCache[templatePath] = node;
 				Loader.templateQueue[templatePath].forEach((queuedResolve) => {
-					queuedResolve(node.querySelector('template').content.cloneNode(true));
+					try {
+						queuedResolve(template.content.cloneNode(true));
+					} catch (error) {
+						console.error('Error in queued template resolve callback:', error);
+					}
 				});
-			});
+			}).catch((error) => {
+				console.error(`Loader.getTemplateHTML error: ${ error.message }`);
+			}));
 		}
 	}
 }

@@ -47,7 +47,7 @@ export default class Component extends HTMLElement {
 			this.constructor.stylesheets.forEach((stylesheet) => {
 				styleSheetPromises.push(
 					new Promise((resolve) => {
-						Loader.getCSS(typeof stylesheet === 'string' ? `${App.staticRoot}${stylesheet}` : stylesheet, resolve);
+						Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
 					}),
 				);
 			});
@@ -86,7 +86,7 @@ export default class Component extends HTMLElement {
 				Object.getOwnPropertyNames(this)
 					.filter((name) => !baseProperties.includes(name))
 					.forEach(function (name) {
-						const internalName = `sprooInternal-${name}`;
+						const internalName = `sprooInternal-${ name }`;
 
 						initialContext[name] = obj[name];
 						Object.defineProperty(obj, internalName, {
@@ -312,7 +312,7 @@ export default class Component extends HTMLElement {
 
 							refElement.addEventListener(eventName, refElement.eventListeners[eventName]);
 						} else {
-							console.warn(`Handler ${attributeValue} not present on component`);
+							console.warn(`Handler ${ attributeValue } not present on component`);
 						}
 					}
 				});
@@ -624,7 +624,7 @@ export default class Component extends HTMLElement {
 	static setContext(component, parent, owner, templateDocument, change) {
 		// Console.time(`Set context ${templateDocument}`);
 		if (!Component.isObject(change)) {
-			throw Error(`Context has to be updated with an object. Got ${change}`);
+			throw Error(`Context has to be updated with an object. Got ${ change }`);
 		}
 
 		owner.templateContext = {
@@ -672,7 +672,7 @@ export default class Component extends HTMLElement {
 							textNode.textContent = boundValue;
 						});
 					} else {
-						templateDocument.querySelectorAll(`[\\[${targetSelection}\\]="${selectorKey}"]`).forEach((elm) => {
+						templateDocument.querySelectorAll(`[\\[${ targetSelection }\\]="${ selectorKey }"]`).forEach((elm) => {
 							if (targetSelection.includes('.')) {
 								const split = targetSelection.split('\\.');
 
@@ -704,13 +704,13 @@ export default class Component extends HTMLElement {
 		return Object.keys(value).map((innerKey) => {
 			if (Component.isObject(value[innerKey])) {
 				return [
-					`${key}.${innerKey}`, Component.spreadPath(innerKey, value[innerKey]).map(
-						(newKey) => `${key}.${newKey}`,
+					`${ key }.${ innerKey }`, Component.spreadPath(innerKey, value[innerKey]).map(
+						(newKey) => `${ key }.${ newKey }`,
 					),
 				].flat();
 			}
 
-			return `${key}.${innerKey}`;
+			return `${ key }.${ innerKey }`;
 		});
 	}
 
