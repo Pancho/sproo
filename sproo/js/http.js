@@ -38,7 +38,7 @@ export default class Http {
 		let queryString = '';
 
 		if (params) {
-			queryString = Object.entries(params).map((entry) => `${ entry[0] }=${ ''.join(entry[1]) }`).join('&');
+			queryString = Object.entries(params).map(([key, value]) => `${ key }=${ value }`).join('&');
 		}
 
 		if (queryString.length > 0) {

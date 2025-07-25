@@ -31,7 +31,7 @@ export default class LoggerFactory {
 			throw Error(`Invalid log level ${ logLevel },  allowed levels:  ${ JSON.stringify(LEVELS) }`);
 		}
 
-		this.logLevels = LEVELS.splice(LEVELS.indexOf(logLevel), LEVELS.length - 1);
+		this.logLevels = LEVELS.splice(LEVELS.indexOf(logLevel), LEVELS.length);
 	}
 
 	static getColorStyle(color) {
