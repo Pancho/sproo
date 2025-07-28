@@ -434,7 +434,6 @@ export default class Component extends HTMLElement {
 		while (textNode) {
 			const parentElement = textNode.parentNode;
 
-			// If (textNode.textContent.includes('{{')) {
 			if (textNode.textContent.includes('{{') && !parentElement.closest('[for-each]')) {
 				const nodes = [];
 
