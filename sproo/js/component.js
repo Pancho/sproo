@@ -47,7 +47,7 @@ export default class Component extends HTMLElement {
 			this.constructor.stylesheets.forEach((stylesheet) => {
 				styleSheetPromises.push(
 					new Promise((resolve) => {
-						Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
+						Loader.getCSS(typeof stylesheet === 'string' ? `${App.staticRoot}${stylesheet}` : stylesheet, resolve);
 					}),
 				);
 			});
@@ -79,14 +79,17 @@ export default class Component extends HTMLElement {
 			*/
 			const baseProperties = Object.keys(this);
 
-			Promise.all([templateReady, ...styleSheetPromises]).then(([templateDocument, ...stylesheets]) => {
+			Promise.all([
+				templateReady,
+				...styleSheetPromises,
+			]).then(([templateDocument, ...stylesheets]) => {
 				const initialContext = {},
 					obj = this;
 
 				Object.getOwnPropertyNames(this)
 					.filter((name) => !baseProperties.includes(name))
 					.forEach(function (name) {
-						const internalName = `sprooInternal-${ name }`;
+						const internalName = `sprooInternal-${name}`;
 
 						initialContext[name] = obj[name];
 						Object.defineProperty(obj, internalName, {
@@ -221,7 +224,7 @@ export default class Component extends HTMLElement {
 	}
 
 	/*
-	* A shorthand for this.shadowRoot.querySelector
+	* Shorthand for this.shadowRoot.querySelector
 	*/
 	getElement(selector) {
 		return this.shadowRoot.querySelector(selector);
@@ -312,7 +315,7 @@ export default class Component extends HTMLElement {
 
 							refElement.addEventListener(eventName, refElement.eventListeners[eventName]);
 						} else {
-							console.warn(`Handler ${ attributeValue } not present on component`);
+							console.warn(`Handler ${attributeValue} not present on component`);
 						}
 					}
 				});
@@ -425,7 +428,11 @@ export default class Component extends HTMLElement {
 							propertyName = propertyName.replace('.', '\\.');
 						}
 
-						owner.bindingIndex[attributeValue] = propertyName;
+						// Store both the target property and the expression
+						owner.bindingIndex[attributeValue] = {
+							property: propertyName,
+							expression: attributeValue,
+						};
 					}
 				});
 			}
@@ -439,14 +446,21 @@ export default class Component extends HTMLElement {
 
 				textNode.textContent.split(TEXT_NODE_TAGS).filter(Boolean).forEach((part) => {
 					if (part.startsWith('{{') && part.endsWith('}}')) {
-						const partCleaned = part.replace('{{', '').replace('}}', '').trim(),
-							newNode = document.createTextNode('');
+						const expression = part.replace('{{', '').replace('}}', '').trim();
+						const newNode = document.createTextNode('');
 
-						if (!owner.bindingIndex[partCleaned]) {
-							owner.bindingIndex[partCleaned] = [];
-						}
+						// Extract variable names from the expression
+						const variables = Component.extractVariables(expression);
 
-						owner.bindingIndex[partCleaned].push(newNode);
+						variables.forEach(varName => {
+							if (!owner.bindingIndex[varName]) {
+								owner.bindingIndex[varName] = [];
+							}
+							owner.bindingIndex[varName].push({
+								node: newNode,
+								expression: expression,
+							});
+						});
 
 						nodes.push(newNode);
 					} else {
@@ -462,14 +476,14 @@ export default class Component extends HTMLElement {
 		}
 	}
 
-	static processIf(component, parent, owner, key, value, inheritedContext) {
+	static processIf(component, parent, owner, key, inheritedContext) {
 		owner.ifIndex[key].forEach((entry) => {
+			const evaluatedValue = Component.evaluateExpression(key, inheritedContext, component);
 			const template = document.importNode(entry.template, true),
 				ifElement = entry.ifElement;
 
-			if (value) {
+			if (evaluatedValue) {
 				if (!entry.template.parentElement) {
-					// We'll just clean the removed "if" element form the index, as it will get recreated if needed again.
 					owner.ifIndex[key] = uniqueBy(owner.ifIndex[key], (item) => item.ifElement);
 
 					template.bindingIndex = {};
@@ -540,7 +554,10 @@ export default class Component extends HTMLElement {
 
 					if (previousIndex === -1) {
 						previousKeys.splice(index, 0, key);
-						adds.push([lastKey, index]);
+						adds.push([
+							lastKey,
+							index,
+						]);
 					} else if (previousIndex !== index) {
 						const keyInSpot = previousKeys.splice(index, 1)[0],
 							keyForSpot = previousKeys.splice(previousIndex - 1, 1)[0];
@@ -548,7 +565,10 @@ export default class Component extends HTMLElement {
 						previousKeys.splice(index, 0, keyForSpot);
 						previousKeys.splice(previousIndex, 0, keyInSpot);
 
-						moves.push([keyInSpot, keyForSpot]);
+						moves.push([
+							keyInSpot,
+							keyForSpot,
+						]);
 					}
 
 					lastKey = key;
@@ -623,7 +643,7 @@ export default class Component extends HTMLElement {
 	static setContext(component, parent, owner, templateDocument, change) {
 		// Console.time(`Set context ${templateDocument}`);
 		if (!Component.isObject(change)) {
-			throw Error(`Context has to be updated with an object. Got ${ change }`);
+			throw Error(`Context has to be updated with an object. Got ${change}`);
 		}
 
 		owner.templateContext = {
@@ -633,14 +653,15 @@ export default class Component extends HTMLElement {
 		};
 
 		Object.entries(change).forEach(([key, value]) => {
-			const selectorKeys = Component.isObject(value) ? [key, ...Component.spreadPath(key, value).flat()] : [key];
+			const selectorKeys = Component.isObject(value) ? [
+				key,
+				...Component.spreadPath(key, value).flat(),
+			] : [key];
 
 			selectorKeys.forEach((selectorKey) => {
 				if (selectorKey in owner.ifIndex) {
-					const extractedValue = selectorKey.split('.').slice(1).reduce((previous, current) => previous[current], value);
-
 					owner.ifIndex[selectorKey].forEach(() => {
-						Component.processIf(component, parent, owner, selectorKey, extractedValue, owner.templateContext);
+						Component.processIf(component, parent, owner, selectorKey, owner.templateContext);
 					});
 				}
 
@@ -663,31 +684,42 @@ export default class Component extends HTMLElement {
 				}
 
 				if (selectorKey in owner.bindingIndex) {
-					const targetSelection = owner.bindingIndex[selectorKey],
-						boundValue = selectorKey.split('.').reduce((blob, prevKey) => blob[prevKey], change);
+					const binding = owner.bindingIndex[selectorKey];
 
-					if (Array.isArray(targetSelection)) {
-						targetSelection.forEach((textNode) => {
-							textNode.textContent = boundValue;
+					if (Array.isArray(binding)) {
+						// Handle text node bindings
+						binding.forEach((bindingInfo) => {
+							bindingInfo.node.textContent = Component.evaluateExpression(
+								bindingInfo.expression,
+								owner.templateContext,
+								component,
+							);
 						});
 					} else {
-						templateDocument.querySelectorAll(`[\\[${ targetSelection }\\]="${ selectorKey }"]`).forEach((elm) => {
-							if (targetSelection.includes('.')) {
-								const split = targetSelection.split('\\.');
+						// Handle attribute bindings
+						templateDocument.querySelectorAll(`[\\[${binding.property}\\]="${selectorKey}"]`)
+							.forEach((elm) => {
+								const evaluatedValue = Component.evaluateExpression(
+									binding.expression,
+									owner.templateContext,
+									component,
+								);
 
-								if (split[0] === 'attr') {
-									elm.setAttribute(split[1], boundValue);
-								} else if (split[0] === 'style') {
-									elm.style[split[1]] = boundValue;
+								if (binding.property.includes('.')) {
+									const split = binding.property.split('\\.');
+									if (split[0] === 'attr') {
+										elm.setAttribute(split[1], evaluatedValue);
+									} else if (split[0] === 'style') {
+										elm.style[split[1]] = evaluatedValue;
+									}
+								} else if (elm instanceof Component) {
+									elm.templateLoaded.then(() => {
+										elm[binding.property] = evaluatedValue;
+									});
+								} else {
+									elm[binding.property] = evaluatedValue;
 								}
-							} else if (elm instanceof Component) {
-								elm.templateLoaded.then(() => {
-									elm[targetSelection] = boundValue;
-								});
-							} else {
-								elm[targetSelection] = boundValue;
-							}
-						});
+							});
 					}
 				}
 			});
@@ -703,13 +735,14 @@ export default class Component extends HTMLElement {
 		return Object.keys(value).map((innerKey) => {
 			if (Component.isObject(value[innerKey])) {
 				return [
-					`${ key }.${ innerKey }`, Component.spreadPath(innerKey, value[innerKey]).map(
-						(newKey) => `${ key }.${ newKey }`,
+					`${key}.${innerKey}`,
+					Component.spreadPath(innerKey, value[innerKey]).map(
+						(newKey) => `${key}.${newKey}`,
 					),
 				].flat();
 			}
 
-			return `${ key }.${ innerKey }`;
+			return `${key}.${innerKey}`;
 		});
 	}
 
@@ -747,5 +780,61 @@ export default class Component extends HTMLElement {
 
 			return previous;
 		}, {});
+	}
+
+	static evaluateExpression(expression, context, component) {
+		// Check if it's just simple variable access (no operators or function calls)
+		if (/^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(expression)) {
+			// Handle nested property access (e.g., "user.name")
+			return expression.split('.').reduce((obj, prop) => obj?.[prop], context);
+		}
+
+		try {
+			// Get all methods from the component's prototype chain
+			const methods = {};
+			let proto = Object.getPrototypeOf(component);
+			while (proto && proto !== HTMLElement.prototype) {
+				Object.getOwnPropertyNames(proto)
+					.filter(name => typeof component[name] === 'function')
+					.forEach(name => {
+						methods[name] = component[name].bind(component);
+					});
+				proto = Object.getPrototypeOf(proto);
+			}
+
+			// Combine methods with context
+			const fullContext = {
+				...methods,
+				...context,
+			};
+
+			const args = Object.keys(fullContext);
+			const values = Object.values(fullContext);
+			const func = new Function(...args, `return ${expression}`);
+			return func.apply(component, values);
+		} catch (e) {
+			console.warn(`Error evaluating expression: ${expression}`, e);
+			return undefined;
+		}
+	}
+
+	static extractVariables(expression) {
+		// This is a simple example - might want to use a proper parser
+		// for more complex expressions
+		const variables = new Set();
+
+		// Remove function calls and operators
+		const cleaned = expression
+			.replace(/\w+\(/g, '')
+			.replace(/[!&|()]/g, ' ');
+
+		// Split by spaces and filter out non-variables
+		cleaned.split(/\s+/).forEach(part => {
+			if (part && !part.match(/^[0-9"'`]/) && part !== 'true' && part !== 'false') {
+				variables.add(part);
+			}
+		});
+
+		return Array.from(variables);
 	}
 }
