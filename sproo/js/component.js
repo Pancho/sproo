@@ -6,8 +6,12 @@ import {uniqueBy} from './utils/array.js';
 
 const CLEAN_TRAILING_SLASH = /\/+$/u,
 	CLEAN_LEADING_SLASH = /^\/+/u,
-	TEXT_NODE_TAGS = /(\{\{.+?\}\})/u;
-
+	TEXT_NODE_TAGS = /(\{\{.+?\}\})/u,
+	FUNCTION_PREFIX = /\w+\(/g,
+	FUNCTION_SUFFIX = /[!&|()]/g,
+	WHITESPACE = /\s+/,
+	FORBIDDEN_VAR_SYNTAX = /^[0-9"'`]/,
+	SIMPLE_PROPERTY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$.]*$/;
 
 export default class Component extends HTMLElement {
 	[Symbol.toStringTag] = 'Component';
@@ -74,7 +78,7 @@ export default class Component extends HTMLElement {
 		}
 
 		this.templateLoaded = new Promise((resolve) => {
-			/* This is the list of all the properties on Component instance. We use this to filter them out, so we're left only with the
+			/* This is the list of all the properties on the Component instance. We use this to filter them out, so we're left only with the
 			 properties on the inherited class's instance.
 			*/
 			const baseProperties = Object.keys(this);
@@ -231,7 +235,7 @@ export default class Component extends HTMLElement {
 	}
 
 	/*
-	* A shorthand for this.shadowRoot.querySelectorAll
+	* Shorthand for this.shadowRoot.querySelectorAll
 	*/
 	getElements(selector) {
 		return this.shadowRoot.querySelectorAll(selector);
@@ -783,8 +787,8 @@ export default class Component extends HTMLElement {
 	}
 
 	static evaluateExpression(expression, context, component) {
-		// Check if it's just simple variable access (no operators or function calls)
-		if (/^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(expression)) {
+		// Modified regex to exclude expressions starting with operators
+		if (SIMPLE_PROPERTY_REGEX.test(expression) && !expression.startsWith('!')) {
 			// Handle nested property access (e.g., "user.name")
 			return expression.split('.').reduce((obj, prop) => obj?.[prop], context);
 		}
@@ -818,6 +822,7 @@ export default class Component extends HTMLElement {
 		}
 	}
 
+
 	static extractVariables(expression) {
 		// This is a simple example - might want to use a proper parser
 		// for more complex expressions
@@ -825,12 +830,12 @@ export default class Component extends HTMLElement {
 
 		// Remove function calls and operators
 		const cleaned = expression
-			.replace(/\w+\(/g, '')
-			.replace(/[!&|()]/g, ' ');
+			.replace(FUNCTION_PREFIX, '')
+			.replace(FUNCTION_SUFFIX, ' ');
 
 		// Split by spaces and filter out non-variables
-		cleaned.split(/\s+/).forEach(part => {
-			if (part && !part.match(/^[0-9"'`]/) && part !== 'true' && part !== 'false') {
+		cleaned.split(WHITESPACE).forEach(part => {
+			if (part && !part.match(FORBIDDEN_VAR_SYNTAX) && part !== 'true' && part !== 'false') {
 				variables.add(part);
 			}
 		});
