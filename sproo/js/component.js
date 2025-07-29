@@ -348,6 +348,32 @@ export default class Component extends HTMLElement {
 		// Console.timeEnd(`Process Template ${ templateDocument }`);
 	}
 
+	static extractVariables(expression) {
+		const variables = new Set();
+
+		// Handle negation case specially
+		if (expression.startsWith('!')) {
+			const baseVar = expression.slice(1);
+			if (SIMPLE_PROPERTY_REGEX.test(baseVar)) {
+				variables.add(baseVar);
+				return Array.from(variables);
+			}
+		}
+
+		// Regular case
+		const cleaned = expression
+			.replace(FUNCTION_PREFIX, '')
+			.replace(FUNCTION_SUFFIX, ' ');
+
+		cleaned.split(WHITESPACE).forEach(part => {
+			if (part && !part.match(FORBIDDEN_VAR_SYNTAX) && part !== 'true' && part !== 'false') {
+				variables.add(part);
+			}
+		});
+
+		return Array.from(variables);
+	}
+
 	static parseIf(component, parent, owner, templateDocument) {
 		const refElements = templateDocument.querySelectorAll('[if]');
 
@@ -360,17 +386,24 @@ export default class Component extends HTMLElement {
 				clone = document.importNode(refElement, true),
 				ifElement = document.createElement('sproo-if');
 
-			if (!owner.ifIndex[attributeValue]) {
-				owner.ifIndex[attributeValue] = [];
-			}
+			// Extract the base variable name(s) that this if depends on
+			const variables = Component.extractVariables(attributeValue);
+
+			// Register the if condition for each variable it depends on
+			variables.forEach(variable => {
+				if (!owner.ifIndex[variable]) {
+					owner.ifIndex[variable] = [];
+				}
+				owner.ifIndex[variable].push({
+					template: clone,
+					ifElement: ifElement,
+					condition: attributeValue, // Store the original condition
+				});
+			});
 
 			refElement.parentElement.insertBefore(ifElement, refElement);
 			refElement.parentElement.removeChild(refElement);
 			clone.removeAttribute('if');
-			owner.ifIndex[attributeValue].push({
-				template: clone,
-				ifElement: ifElement,
-			});
 
 			return false;
 		});
@@ -482,14 +515,13 @@ export default class Component extends HTMLElement {
 
 	static processIf(component, parent, owner, key, inheritedContext) {
 		owner.ifIndex[key].forEach((entry) => {
-			const evaluatedValue = Component.evaluateExpression(key, inheritedContext, component);
-			const template = document.importNode(entry.template, true),
-				ifElement = entry.ifElement;
+			// Use the original condition stored during parsing
+			const evaluatedValue = Component.evaluateExpression(entry.condition, inheritedContext, component);
+			const template = document.importNode(entry.template, true);
+			const ifElement = entry.ifElement;
 
 			if (evaluatedValue) {
-				if (!entry.template.parentElement) {
-					owner.ifIndex[key] = uniqueBy(owner.ifIndex[key], (item) => item.ifElement);
-
+				if (!entry.inserted) {
 					template.bindingIndex = {};
 					template.ifIndex = {};
 					template.forEachIndex = {};
@@ -787,14 +819,18 @@ export default class Component extends HTMLElement {
 	}
 
 	static evaluateExpression(expression, context, component) {
-		// Modified regex to exclude expressions starting with operators
+		// Check if it's a simple negation case
+		if (expression.startsWith('!') && SIMPLE_PROPERTY_REGEX.test(expression.slice(1))) {
+			const baseValue = expression.slice(1).split('.').reduce((obj, prop) => obj?.[prop], context);
+			return !baseValue;
+		}
+
+		// Rest of the existing evaluateExpression code...
 		if (SIMPLE_PROPERTY_REGEX.test(expression) && !expression.startsWith('!')) {
-			// Handle nested property access (e.g., "user.name")
 			return expression.split('.').reduce((obj, prop) => obj?.[prop], context);
 		}
 
 		try {
-			// Get all methods from the component's prototype chain
 			const methods = {};
 			let proto = Object.getPrototypeOf(component);
 			while (proto && proto !== HTMLElement.prototype) {
@@ -806,7 +842,6 @@ export default class Component extends HTMLElement {
 				proto = Object.getPrototypeOf(proto);
 			}
 
-			// Combine methods with context
 			const fullContext = {
 				...methods,
 				...context,
@@ -823,23 +858,4 @@ export default class Component extends HTMLElement {
 	}
 
 
-	static extractVariables(expression) {
-		// This is a simple example - might want to use a proper parser
-		// for more complex expressions
-		const variables = new Set();
-
-		// Remove function calls and operators
-		const cleaned = expression
-			.replace(FUNCTION_PREFIX, '')
-			.replace(FUNCTION_SUFFIX, ' ');
-
-		// Split by spaces and filter out non-variables
-		cleaned.split(WHITESPACE).forEach(part => {
-			if (part && !part.match(FORBIDDEN_VAR_SYNTAX) && part !== 'true' && part !== 'false') {
-				variables.add(part);
-			}
-		});
-
-		return Array.from(variables);
-	}
 }
