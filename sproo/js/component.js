@@ -10,7 +10,42 @@ const CLEAN_TRAILING_SLASH = /\/+$/u,
 	FUNCTION_SUFFIX = /[!&|()]/u,
 	WHITESPACE = /\s+/u,
 	FORBIDDEN_VAR_SYNTAX = /^[0-9"'`]/u,
-	SIMPLE_PROPERTY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$.]*$/u;
+	SIMPLE_PROPERTY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$.]*$/u,
+	JS_RESERVED_WORDS = new Set([
+		'true',
+		'false',
+		'null',
+		'undefined',
+		'this',
+		'new',
+		'function',
+		'class',
+		'if',
+		'else',
+		'for',
+		'while',
+		'do',
+		'try',
+		'catch',
+		'finally',
+		'throw',
+		'return',
+		'break',
+		'continue',
+		'switch',
+		'case',
+		'default',
+		'var',
+		'let',
+		'const',
+	]),
+	STRING_LITERALS = /'([^'\\]|\\.)*'|"([^"\\]|\\.)*"|`([^`\\]|\\.)*`/ug,
+	PROPERTY_ACCESS_PATTERN = /([a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*)/ug,
+	ARRAY_DESTRUCTURING_PATTERN = /\[([^\]]+)\]\s*=/u,
+	OBJECT_DESTRUCTURING_PATTERN = /\{([^}]+)}\s*=/,
+	TERNARY_DESTRUCTURING_PATTERN = /[?:]/u,
+	LOGICAL_OPERATORS_PATTERN = /&&|\|\||[!()]/ug,
+	ARITHMETIC_OPERATORS_PATTERN = /[-+*/=%<>]/ug;
 
 export default class Component extends HTMLElement {
 	[Symbol.toStringTag] = 'Component';
@@ -40,7 +75,7 @@ export default class Component extends HTMLElement {
 			this.constructor.stylesheets.forEach((stylesheet) => {
 				styleSheetPromises.push(
 					new Promise((resolve) => {
-						Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
+						Loader.getCSS(typeof stylesheet === 'string' ? `${App.staticRoot}${stylesheet}` : stylesheet, resolve);
 					}),
 				);
 			});
@@ -82,7 +117,7 @@ export default class Component extends HTMLElement {
 				Object.getOwnPropertyNames(this)
 					.filter((name) => !baseProperties.includes(name))
 					.forEach(function (name) {
-						const internalName = `sprooInternal-${ name }`;
+						const internalName = `sprooInternal-${name}`;
 
 						initialContext[name] = obj[name];
 						Object.defineProperty(obj, internalName, {
@@ -146,9 +181,6 @@ export default class Component extends HTMLElement {
 		});
 	}
 
-	// ... other methods
-
-	// In the evaluateExpression method, add ESLint disable comment for necessary exception
 	static evaluateExpression(expression, context, component) {
 		if (expression.startsWith('!') && SIMPLE_PROPERTY_REGEX.test(expression.slice(1))) {
 			const baseValue = expression.slice(1).split('.').reduce((obj, prop) => obj?.[prop], context);
@@ -180,11 +212,11 @@ export default class Component extends HTMLElement {
 				args = Object.keys(fullContext),
 				values = Object.values(fullContext),
 				// eslint-disable-next-line no-new-func
-				func = new Function(...args, `return ${ expression }`);
+				func = new Function(...args, `return ${expression}`);
 
 			return func.apply(component, values);
 		} catch (e) {
-			console.warn(`Error evaluating expression: ${ expression }`, e);
+			console.warn(`Error evaluating expression: ${expression}`, e);
 
 			return null;
 		}
@@ -352,7 +384,7 @@ export default class Component extends HTMLElement {
 
 							refElement.addEventListener(eventName, refElement.eventListeners[eventName]);
 						} else {
-							console.warn(`Handler ${ attributeValue } not present on component`);
+							console.warn(`Handler ${attributeValue} not present on component`);
 						}
 					}
 				});
@@ -382,28 +414,69 @@ export default class Component extends HTMLElement {
 	}
 
 	static extractVariables(expression) {
-		const variables = new Set;
+		const variables = new Set();
 
-		// Handle negation case specially
-		if (expression.startsWith('!')) {
-			const baseVar = expression.slice(1);
+		// Handle common JavaScript patterns
+		function parseExpression(expr) {
+			// Skip if empty or just whitespace
+			if (!expr || !expr.trim()) {
+				return;
+			}
 
-			if (SIMPLE_PROPERTY_REGEX.test(baseVar)) {
-				variables.add(baseVar);
+			// Remove string literals
+			expr = expr.replace(STRING_LITERALS, '');
 
-				return Array.from(variables);
+			// Handle object property access (both dot and bracket notation)
+			const matches = expr.match(PROPERTY_ACCESS_PATTERN);
+			if (matches) {
+				matches.forEach(match => {
+					// Get the base variable name (before any dots)
+					const baseVar = match.split('.')[0];
+					if (isValidVariable(baseVar)) {
+						variables.add(baseVar);
+					}
+				});
+			}
+
+			// Handle array destructuring
+			const destructuringMatch = expr.match(ARRAY_DESTRUCTURING_PATTERN);
+			if (destructuringMatch) {
+				destructuringMatch[1].split(',')
+					.map(v => v.trim())
+					.filter(isValidVariable)
+					.forEach(v => variables.add(v));
+			}
+
+			// Handle object destructuring
+			const objDestructMatch = expr.match(OBJECT_DESTRUCTURING_PATTERN);
+			if (objDestructMatch) {
+				objDestructMatch[1].split(',')
+					.map(v => v.split(':')[0].trim())
+					.filter(isValidVariable)
+					.forEach(v => variables.add(v));
 			}
 		}
 
-		// Regular case
-		const cleaned = expression
-			.replace(FUNCTION_PREFIX, '')
-			.replace(FUNCTION_SUFFIX, ' ');
+		function isValidVariable(name) {
+			// Skip JavaScript keywords and literals
+			return name &&
+				!JS_RESERVED_WORDS.has(name) &&
+				!name.match(FORBIDDEN_VAR_SYNTAX) &&
+				SIMPLE_PROPERTY_REGEX.test(name);
+		}
 
-		cleaned.split(WHITESPACE).forEach((part) => {
-			if (part && !part.match(FORBIDDEN_VAR_SYNTAX) && part !== 'true' && part !== 'false') {
-				variables.add(part);
-			}
+		// Handle ternary operators
+		const ternaryParts = expression.split(TERNARY_DESTRUCTURING_PATTERN);
+		ternaryParts.forEach(parseExpression);
+
+		// Handle logical operators
+		expression.split(LOGICAL_OPERATORS_PATTERN).forEach(part => {
+			parseExpression(part.trim());
+		});
+
+		// Handle arithmetic operations
+		expression.split(ARITHMETIC_OPERATORS_PATTERN).forEach(part => {
+			parseExpression(part.trim());
 		});
 
 		return Array.from(variables);
@@ -716,7 +789,7 @@ export default class Component extends HTMLElement {
 	static setContext(component, parent, owner, templateDocument, change) {
 		// Console.time(`Set context ${templateDocument}`);
 		if (!Component.isObject(change)) {
-			throw Error(`Context has to be updated with an object. Got ${ change }`);
+			throw Error(`Context has to be updated with an object. Got ${change}`);
 		}
 
 		owner.templateContext = {
@@ -770,7 +843,7 @@ export default class Component extends HTMLElement {
 						});
 					} else {
 						// Handle attribute bindings
-						templateDocument.querySelectorAll(`[\\[${ binding.property }\\]="${ selectorKey }"]`)
+						templateDocument.querySelectorAll(`[\\[${binding.property}\\]="${selectorKey}"]`)
 							.forEach((elm) => {
 								const evaluatedValue = Component.evaluateExpression(
 									binding.expression,
@@ -809,14 +882,14 @@ export default class Component extends HTMLElement {
 		return Object.keys(value).map((innerKey) => {
 			if (Component.isObject(value[innerKey])) {
 				return [
-					`${ key }.${ innerKey }`,
+					`${key}.${innerKey}`,
 					Component.spreadPath(innerKey, value[innerKey]).map(
-						(newKey) => `${ key }.${ newKey }`,
+						(newKey) => `${key}.${newKey}`,
 					),
 				].flat();
 			}
 
-			return `${ key }.${ innerKey }`;
+			return `${key}.${innerKey}`;
 		});
 	}
 
