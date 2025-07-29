@@ -1,38 +1,27 @@
 import App from './app.js';
 import DeepProxy from './utils/deepproxy.js';
 import Loader from './utils/loader.js';
-import {uniqueBy} from './utils/array.js';
 
-
+// Add 'u' flag to regex constants
 const CLEAN_TRAILING_SLASH = /\/+$/u,
 	CLEAN_LEADING_SLASH = /^\/+/u,
 	TEXT_NODE_TAGS = /(\{\{.+?\}\})/u,
-	FUNCTION_PREFIX = /\w+\(/g,
-	FUNCTION_SUFFIX = /[!&|()]/g,
-	WHITESPACE = /\s+/,
-	FORBIDDEN_VAR_SYNTAX = /^[0-9"'`]/,
-	SIMPLE_PROPERTY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$.]*$/;
+	FUNCTION_PREFIX = /\w+\(/u,
+	FUNCTION_SUFFIX = /[!&|()]/u,
+	WHITESPACE = /\s+/u,
+	FORBIDDEN_VAR_SYNTAX = /^[0-9"'`]/u,
+	SIMPLE_PROPERTY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$.]*$/u;
 
 export default class Component extends HTMLElement {
 	[Symbol.toStringTag] = 'Component';
-	// Promise that's resolved when the onTemplateLoaded has already been executed
 	templateLoaded;
-	// Index of bound elements. Can change during runtime as it gets updated (or rather overwritten) on every mutation.
 	bindingIndex = {};
-	// If element Index
 	ifIndex = {};
-	// For-each element Index
 	forEachIndex = {};
 
-	/* Creates an instance of Component, which is really just a convenience wrapper for HTMLElement (the actual component)
-	*
-	* @constructor
-	* @author: www.unuaondo.com
-	*/
 	constructor() {
 		super();
 
-		// Template context, from which the template gets updated
 		this.templateContext = {};
 		this.attachShadow({mode: 'open'});
 
@@ -51,7 +40,7 @@ export default class Component extends HTMLElement {
 			this.constructor.stylesheets.forEach((stylesheet) => {
 				styleSheetPromises.push(
 					new Promise((resolve) => {
-						Loader.getCSS(typeof stylesheet === 'string' ? `${App.staticRoot}${stylesheet}` : stylesheet, resolve);
+						Loader.getCSS(typeof stylesheet === 'string' ? `${ App.staticRoot }${ stylesheet }` : stylesheet, resolve);
 					}),
 				);
 			});
@@ -93,7 +82,7 @@ export default class Component extends HTMLElement {
 				Object.getOwnPropertyNames(this)
 					.filter((name) => !baseProperties.includes(name))
 					.forEach(function (name) {
-						const internalName = `sprooInternal-${name}`;
+						const internalName = `sprooInternal-${ name }`;
 
 						initialContext[name] = obj[name];
 						Object.defineProperty(obj, internalName, {
@@ -155,6 +144,50 @@ export default class Component extends HTMLElement {
 				}
 			});
 		});
+	}
+
+	// ... other methods
+
+	// In the evaluateExpression method, add ESLint disable comment for necessary exception
+	static evaluateExpression(expression, context, component) {
+		if (expression.startsWith('!') && SIMPLE_PROPERTY_REGEX.test(expression.slice(1))) {
+			const baseValue = expression.slice(1).split('.').reduce((obj, prop) => obj?.[prop], context);
+
+			return !baseValue;
+		}
+
+		if (SIMPLE_PROPERTY_REGEX.test(expression) && !expression.startsWith('!')) {
+			return expression.split('.').reduce((obj, prop) => obj?.[prop], context);
+		}
+
+		try {
+			const methods = {};
+			let proto = Object.getPrototypeOf(component);
+
+			while (proto && proto !== HTMLElement.prototype) {
+				Object.getOwnPropertyNames(proto)
+					.filter((name) => typeof component[name] === 'function')
+					.forEach((name) => {
+						methods[name] = component[name].bind(component);
+					});
+				proto = Object.getPrototypeOf(proto);
+			}
+
+			const fullContext = {
+					...methods,
+					...context,
+				},
+				args = Object.keys(fullContext),
+				values = Object.values(fullContext),
+				// eslint-disable-next-line no-new-func
+				func = new Function(...args, `return ${ expression }`);
+
+			return func.apply(component, values);
+		} catch (e) {
+			console.warn(`Error evaluating expression: ${ expression }`, e);
+
+			return null;
+		}
 	}
 
 	updatePageLinks(doc) {
@@ -319,7 +352,7 @@ export default class Component extends HTMLElement {
 
 							refElement.addEventListener(eventName, refElement.eventListeners[eventName]);
 						} else {
-							console.warn(`Handler ${attributeValue} not present on component`);
+							console.warn(`Handler ${ attributeValue } not present on component`);
 						}
 					}
 				});
@@ -349,13 +382,15 @@ export default class Component extends HTMLElement {
 	}
 
 	static extractVariables(expression) {
-		const variables = new Set();
+		const variables = new Set;
 
 		// Handle negation case specially
 		if (expression.startsWith('!')) {
 			const baseVar = expression.slice(1);
+
 			if (SIMPLE_PROPERTY_REGEX.test(baseVar)) {
 				variables.add(baseVar);
+
 				return Array.from(variables);
 			}
 		}
@@ -365,7 +400,7 @@ export default class Component extends HTMLElement {
 			.replace(FUNCTION_PREFIX, '')
 			.replace(FUNCTION_SUFFIX, ' ');
 
-		cleaned.split(WHITESPACE).forEach(part => {
+		cleaned.split(WHITESPACE).forEach((part) => {
 			if (part && !part.match(FORBIDDEN_VAR_SYNTAX) && part !== 'true' && part !== 'false') {
 				variables.add(part);
 			}
@@ -384,16 +419,17 @@ export default class Component extends HTMLElement {
 
 			const attributeValue = refElement.getAttribute('if'),
 				clone = document.importNode(refElement, true),
-				ifElement = document.createElement('sproo-if');
+				ifElement = document.createElement('sproo-if'),
 
-			// Extract the base variable name(s) that this if depends on
-			const variables = Component.extractVariables(attributeValue);
+				// Extract the base variable name(s) that this if depends on
+				variables = Component.extractVariables(attributeValue);
 
 			// Register the if condition for each variable it depends on
-			variables.forEach(variable => {
+			variables.forEach((variable) => {
 				if (!owner.ifIndex[variable]) {
 					owner.ifIndex[variable] = [];
 				}
+
 				owner.ifIndex[variable].push({
 					template: clone,
 					ifElement: ifElement,
@@ -483,16 +519,17 @@ export default class Component extends HTMLElement {
 
 				textNode.textContent.split(TEXT_NODE_TAGS).filter(Boolean).forEach((part) => {
 					if (part.startsWith('{{') && part.endsWith('}}')) {
-						const expression = part.replace('{{', '').replace('}}', '').trim();
-						const newNode = document.createTextNode('');
+						const expression = part.replace('{{', '').replace('}}', '').trim(),
+							newNode = document.createTextNode(''),
 
-						// Extract variable names from the expression
-						const variables = Component.extractVariables(expression);
+							// Extract variable names from the expression
+							variables = Component.extractVariables(expression);
 
-						variables.forEach(varName => {
+						variables.forEach((varName) => {
 							if (!owner.bindingIndex[varName]) {
 								owner.bindingIndex[varName] = [];
 							}
+
 							owner.bindingIndex[varName].push({
 								node: newNode,
 								expression: expression,
@@ -516,9 +553,9 @@ export default class Component extends HTMLElement {
 	static processIf(component, parent, owner, key, inheritedContext) {
 		owner.ifIndex[key].forEach((entry) => {
 			// Use the original condition stored during parsing
-			const evaluatedValue = Component.evaluateExpression(entry.condition, inheritedContext, component);
-			const template = document.importNode(entry.template, true);
-			const ifElement = entry.ifElement;
+			const evaluatedValue = Component.evaluateExpression(entry.condition, inheritedContext, component),
+				template = document.importNode(entry.template, true),
+				ifElement = entry.ifElement;
 
 			if (evaluatedValue) {
 				if (!entry.inserted) {
@@ -679,7 +716,7 @@ export default class Component extends HTMLElement {
 	static setContext(component, parent, owner, templateDocument, change) {
 		// Console.time(`Set context ${templateDocument}`);
 		if (!Component.isObject(change)) {
-			throw Error(`Context has to be updated with an object. Got ${change}`);
+			throw Error(`Context has to be updated with an object. Got ${ change }`);
 		}
 
 		owner.templateContext = {
@@ -733,7 +770,7 @@ export default class Component extends HTMLElement {
 						});
 					} else {
 						// Handle attribute bindings
-						templateDocument.querySelectorAll(`[\\[${binding.property}\\]="${selectorKey}"]`)
+						templateDocument.querySelectorAll(`[\\[${ binding.property }\\]="${ selectorKey }"]`)
 							.forEach((elm) => {
 								const evaluatedValue = Component.evaluateExpression(
 									binding.expression,
@@ -743,6 +780,7 @@ export default class Component extends HTMLElement {
 
 								if (binding.property.includes('.')) {
 									const split = binding.property.split('\\.');
+
 									if (split[0] === 'attr') {
 										elm.setAttribute(split[1], evaluatedValue);
 									} else if (split[0] === 'style') {
@@ -771,14 +809,14 @@ export default class Component extends HTMLElement {
 		return Object.keys(value).map((innerKey) => {
 			if (Component.isObject(value[innerKey])) {
 				return [
-					`${key}.${innerKey}`,
+					`${ key }.${ innerKey }`,
 					Component.spreadPath(innerKey, value[innerKey]).map(
-						(newKey) => `${key}.${newKey}`,
+						(newKey) => `${ key }.${ newKey }`,
 					),
 				].flat();
 			}
 
-			return `${key}.${innerKey}`;
+			return `${ key }.${ innerKey }`;
 		});
 	}
 
@@ -817,45 +855,4 @@ export default class Component extends HTMLElement {
 			return previous;
 		}, {});
 	}
-
-	static evaluateExpression(expression, context, component) {
-		// Check if it's a simple negation case
-		if (expression.startsWith('!') && SIMPLE_PROPERTY_REGEX.test(expression.slice(1))) {
-			const baseValue = expression.slice(1).split('.').reduce((obj, prop) => obj?.[prop], context);
-			return !baseValue;
-		}
-
-		// Rest of the existing evaluateExpression code...
-		if (SIMPLE_PROPERTY_REGEX.test(expression) && !expression.startsWith('!')) {
-			return expression.split('.').reduce((obj, prop) => obj?.[prop], context);
-		}
-
-		try {
-			const methods = {};
-			let proto = Object.getPrototypeOf(component);
-			while (proto && proto !== HTMLElement.prototype) {
-				Object.getOwnPropertyNames(proto)
-					.filter(name => typeof component[name] === 'function')
-					.forEach(name => {
-						methods[name] = component[name].bind(component);
-					});
-				proto = Object.getPrototypeOf(proto);
-			}
-
-			const fullContext = {
-				...methods,
-				...context,
-			};
-
-			const args = Object.keys(fullContext);
-			const values = Object.values(fullContext);
-			const func = new Function(...args, `return ${expression}`);
-			return func.apply(component, values);
-		} catch (e) {
-			console.warn(`Error evaluating expression: ${expression}`, e);
-			return undefined;
-		}
-	}
-
-
 }
