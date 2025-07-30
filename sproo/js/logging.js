@@ -40,8 +40,7 @@ export default class LoggerFactory {
 	}
 
 	static classToColor(clazz) {
-		let color = '#ffffff',
-			hash = 0,
+		let hash = 0,
 			i = 0;
 		const len = clazz.name.length;
 
@@ -49,12 +48,14 @@ export default class LoggerFactory {
 			hash = clazz.name.charCodeAt(i) + ((hash << 5) - hash);
 		}
 
-		color = (hash & WHITE)
-			.toString(16)
-			.toUpperCase();
+		// Generate RGB components with reduced brightness to ensure dark colors
+		const r = Math.floor((hash & 0xFF) * 0.6), // Limit red to 60% of max
+			g = Math.floor(((hash >> 8) & 0xFF) * 0.6), // Limit green to 60% of max
+			b = Math.floor(((hash >> 16) & 0xFF) * 0.6), // Limit blue to 60% of max
+			toHex = (value) => Number(value).toString(16).padStart(2, '0');
 
-		return '#00000'.substring(1, 6 - color.length) + color;
-	}
+	return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
 
 	static createWorker(fn) {
 		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${ fn }`])));
