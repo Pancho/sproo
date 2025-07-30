@@ -6,11 +6,19 @@ import Loader from './utils/loader.js';
 const CLEAN_TRAILING_SLASH = /\/+$/u,
 	CLEAN_LEADING_SLASH = /^\/+/u,
 	TEXT_NODE_TAGS = /(\{\{.+?\}\})/u,
-	FUNCTION_PREFIX = /\w+\(/u,
-	FUNCTION_SUFFIX = /[!&|()]/u,
+	FUNCTION_PREFIX = /^\w+\s*\(/u,
+	FUNCTION_SUFFIX = /[!&|()]/,
+	FUNCTION_REGEX = /^(\w+)\s*\(([^)]*)\)/u,
 	WHITESPACE = /\s+/u,
 	FORBIDDEN_VAR_SYNTAX = /^[0-9"'`]/u,
 	SIMPLE_PROPERTY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$.]*$/u,
+	STRING_LITERALS = /'([^'\\]|\\.)*'|"([^"\\]|\\.)*"|`([^`\\]|\\.)*`/u,
+	PROPERTY_ACCESS_PATTERN = /([a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*)/ug,
+	ARRAY_DESTRUCTURING_PATTERN = /\[([^\]]+)\]\s*=/u,
+	OBJECT_DESTRUCTURING_PATTERN = /\{([^}]+)}\s*=/,
+	TERNARY_DESTRUCTURING_PATTERN = /[?:]/u,
+	LOGICAL_OPERATORS_PATTERN = /&&|\|\||[!()]/u,
+	ARITHMETIC_OPERATORS_PATTERN = /[-+*/=%<>]/u,
 	JS_RESERVED_WORDS = new Set([
 		'true',
 		'false',
@@ -39,13 +47,12 @@ const CLEAN_TRAILING_SLASH = /\/+$/u,
 		'let',
 		'const',
 	]),
-	STRING_LITERALS = /'([^'\\]|\\.)*'|"([^"\\]|\\.)*"|`([^`\\]|\\.)*`/ug,
-	PROPERTY_ACCESS_PATTERN = /([a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*)/ug,
-	ARRAY_DESTRUCTURING_PATTERN = /\[([^\]]+)\]\s*=/u,
-	OBJECT_DESTRUCTURING_PATTERN = /\{([^}]+)}\s*=/,
-	TERNARY_DESTRUCTURING_PATTERN = /[?:]/u,
-	LOGICAL_OPERATORS_PATTERN = /&&|\|\||[!()]/ug,
-	ARITHMETIC_OPERATORS_PATTERN = /[-+*/=%<>]/ug;
+	GLOBAL_OBJECTS = new Set([
+		'App',
+		'window',
+		'document',
+		'Component',
+	]);
 
 export default class Component extends HTMLElement {
 	[Symbol.toStringTag] = 'Component';
@@ -328,7 +335,12 @@ export default class Component extends HTMLElement {
 	}
 
 	dispatch(eventName, obj) {
-		this.dispatchEvent(new CustomEvent(eventName, obj));
+		this.dispatchEvent(new CustomEvent(eventName, {
+				bubbles: true,
+				composed: true,
+				payload: obj,
+			},
+		));
 	}
 
 	static parseReferences(component, templateDocument) {
@@ -414,9 +426,26 @@ export default class Component extends HTMLElement {
 	}
 
 	static extractVariables(expression) {
-		const variables = new Set();
+		const variables = new Set(),
+			functions = new Set();
 
-		// Handle common JavaScript patterns
+		// First handle function calls
+		let modifiedExpr = expression;
+		let functionMatch;
+		while ((functionMatch = FUNCTION_REGEX.exec(modifiedExpr)) !== null) {
+			if (FUNCTION_PREFIX.test(functionMatch[0])) {
+				// Extract the function name
+				functions.add(functionMatch[1]);
+			}
+
+			if (functionMatch[2]) {
+				// Recursively extract variables from function parameters
+				Component.extractVariables(functionMatch[2]).forEach(v => variables.add(v));
+			}
+			// Remove the processed function call to avoid re-processing
+			modifiedExpr = modifiedExpr.replace(functionMatch[0], '');
+		}
+
 		function parseExpression(expr) {
 			// Skip if empty or just whitespace
 			if (!expr || !expr.trim()) {
@@ -432,7 +461,7 @@ export default class Component extends HTMLElement {
 				matches.forEach(match => {
 					// Get the base variable name (before any dots)
 					const baseVar = match.split('.')[0];
-					if (isValidVariable(baseVar)) {
+					if (isValidVariable(baseVar) && !functions.has(baseVar)) {
 						variables.add(baseVar);
 					}
 				});
@@ -443,7 +472,7 @@ export default class Component extends HTMLElement {
 			if (destructuringMatch) {
 				destructuringMatch[1].split(',')
 					.map(v => v.trim())
-					.filter(isValidVariable)
+					.filter(v => isValidVariable(v) && !functions.has(v))
 					.forEach(v => variables.add(v));
 			}
 
@@ -452,7 +481,7 @@ export default class Component extends HTMLElement {
 			if (objDestructMatch) {
 				objDestructMatch[1].split(',')
 					.map(v => v.split(':')[0].trim())
-					.filter(isValidVariable)
+					.filter(v => isValidVariable(v) && !functions.has(v))
 					.forEach(v => variables.add(v));
 			}
 		}
@@ -461,21 +490,24 @@ export default class Component extends HTMLElement {
 			// Skip JavaScript keywords and literals
 			return name &&
 				!JS_RESERVED_WORDS.has(name) &&
+				!GLOBAL_OBJECTS.has(name) &&
+				!functions.has(name) &&
 				!name.match(FORBIDDEN_VAR_SYNTAX) &&
 				SIMPLE_PROPERTY_REGEX.test(name);
 		}
 
+		// Process the modified expression (after removing function calls)
 		// Handle ternary operators
-		const ternaryParts = expression.split(TERNARY_DESTRUCTURING_PATTERN);
+		const ternaryParts = modifiedExpr.split(TERNARY_DESTRUCTURING_PATTERN);
 		ternaryParts.forEach(parseExpression);
 
 		// Handle logical operators
-		expression.split(LOGICAL_OPERATORS_PATTERN).forEach(part => {
+		modifiedExpr.split(LOGICAL_OPERATORS_PATTERN).forEach(part => {
 			parseExpression(part.trim());
 		});
 
 		// Handle arithmetic operations
-		expression.split(ARITHMETIC_OPERATORS_PATTERN).forEach(part => {
+		modifiedExpr.split(ARITHMETIC_OPERATORS_PATTERN).forEach(part => {
 			parseExpression(part.trim());
 		});
 
@@ -598,16 +630,23 @@ export default class Component extends HTMLElement {
 							// Extract variable names from the expression
 							variables = Component.extractVariables(expression);
 
-						variables.forEach((varName) => {
-							if (!owner.bindingIndex[varName]) {
-								owner.bindingIndex[varName] = [];
-							}
+						// If there are variables, set up bindings
+						if (variables.length > 0) {
+							variables.forEach((varName) => {
+								if (!owner.bindingIndex[varName]) {
+									owner.bindingIndex[varName] = [];
+								}
 
-							owner.bindingIndex[varName].push({
-								node: newNode,
-								expression: expression,
+								owner.bindingIndex[varName].push({
+									node: newNode,
+									expression: expression,
+								});
 							});
-						});
+						} else {
+							// No variables found, but we still need to evaluate the expression once
+							// This handles cases like static function calls: App._('Translation')
+							newNode.textContent = Component.evaluateExpression(expression, owner.templateContext, owner);
+						}
 
 						nodes.push(newNode);
 					} else {
