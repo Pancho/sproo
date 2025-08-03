@@ -203,7 +203,7 @@ export default class Component extends HTMLElement {
 			const methods = {};
 			let proto = Object.getPrototypeOf(component);
 
-			while (proto && proto !== HTMLElement.prototype) {
+			while (proto && !proto.constructor.name.startsWith('HTML')) {
 				Object.getOwnPropertyNames(proto)
 					.filter((name) => typeof component[name] === 'function')
 					.forEach((name) => {
@@ -224,7 +224,6 @@ export default class Component extends HTMLElement {
 			return func.apply(component, values);
 		} catch (e) {
 			console.warn(`Error evaluating expression: ${expression}`, e);
-
 			return null;
 		}
 	}
@@ -644,8 +643,8 @@ export default class Component extends HTMLElement {
 							});
 						} else {
 							// No variables found, but we still need to evaluate the expression once
-							// This handles cases like static function calls: App._('Translation')
-							newNode.textContent = Component.evaluateExpression(expression, owner.templateContext, owner);
+							// This handles cases like static function calls: getTranslation('Translation')
+							newNode.textContent = Component.evaluateExpression(expression, {}, component);
 						}
 
 						nodes.push(newNode);
@@ -903,7 +902,11 @@ export default class Component extends HTMLElement {
 										elm[binding.property] = evaluatedValue;
 									});
 								} else {
-									elm[binding.property] = evaluatedValue;
+									if (elm.hasOwnProperty(binding.property)) {
+										elm[binding.property] = evaluatedValue;
+									} else {
+										elm.setAttribute(binding.property, evaluatedValue);
+									}
 								}
 							});
 					}

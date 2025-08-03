@@ -28,7 +28,7 @@ export default class LoggerFactory {
 
 	setLogLevel(logLevel) {
 		if (!LEVELS.includes(logLevel)) {
-			throw Error(`Invalid log level ${ logLevel },  allowed levels:  ${ JSON.stringify(LEVELS) }`);
+			throw Error(`Invalid log level ${logLevel},  allowed levels:  ${JSON.stringify(LEVELS)}`);
 		}
 
 		this.logLevels = LEVELS.splice(LEVELS.indexOf(logLevel), LEVELS.length);
@@ -36,7 +36,7 @@ export default class LoggerFactory {
 
 	static getColorStyle(color) {
 		return `color: white; background-color: ${
-			color }; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
+			color}; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
 	}
 
 	static classToColor(clazz) {
@@ -54,11 +54,11 @@ export default class LoggerFactory {
 			b = Math.floor(((hash >> 16) & 0xFF) * 0.6), // Limit blue to 60% of max
 			toHex = (value) => Number(value).toString(16).padStart(2, '0');
 
-	return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
+		return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+	}
 
 	static createWorker(fn) {
-		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${ fn }`])));
+		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${fn}`])));
 	}
 }
 
@@ -80,7 +80,8 @@ class LoggerService {
 
 	get trace() {
 		if (!this.logLevels.includes('trace')) {
-			return () => {};
+			return () => {
+			};
 		}
 
 		if (this.worker) {
@@ -89,12 +90,13 @@ class LoggerService {
 			};
 		}
 
-		return console.trace.bind(window.console, `%c TRACE: ${ this.clazz.name }`, this.style);
+		return console.trace.bind(window.console, `%cTRACE: ${this.clazz.name}`, this.style);
 	}
 
 	get debug() {
 		if (!this.logLevels.includes('debug')) {
-			return () => {};
+			return () => {
+			};
 		}
 
 		if (this.worker) {
@@ -103,12 +105,13 @@ class LoggerService {
 			};
 		}
 
-		return console.debug.bind(window.console, `%c DEBUG: ${ this.clazz.name }`, this.style);
+		return console.debug.bind(window.console, `%cDEBUG: ${this.clazz.name}`, this.style);
 	}
 
 	get log() {
 		if (!this.logLevels.includes('log')) {
-			return () => {};
+			return () => {
+			};
 		}
 
 		if (this.worker) {
@@ -117,12 +120,13 @@ class LoggerService {
 			};
 		}
 
-		return console.log.bind(window.console, `%c LOG: ${ this.clazz.name }`, this.style);
+		return console.log.bind(window.console, `%cLOG: ${this.clazz.name}`, this.style);
 	}
 
 	get warn() {
 		if (!this.logLevels.includes('warn')) {
-			return () => {};
+			return () => {
+			};
 		}
 
 		if (this.worker) {
@@ -131,12 +135,13 @@ class LoggerService {
 			};
 		}
 
-		return console.warn.bind(window.console, `%c WARN: ${ this.clazz.name }`, this.style);
+		return console.warn.bind(window.console, `%cWARN: ${this.clazz.name}`, this.style);
 	}
 
 	get error() {
 		if (!this.logLevels.includes('error')) {
-			return () => {};
+			return () => {
+			};
 		}
 
 		if (this.worker) {
@@ -145,7 +150,7 @@ class LoggerService {
 			};
 		}
 
-		return console.error.bind(window.console, `%c ERROR: ${ this.clazz.name }`, this.style);
+		return console.error.bind(window.console, `%cERROR: ${this.clazz.name}`, this.style);
 	}
 
 	static postMessage(worker, clazz, level, ...args) {
