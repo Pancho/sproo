@@ -377,7 +377,7 @@ export default class Component extends HTMLElement {
                                 refElement.eventListeners = {};
                             }
 
-                            if (refElement.closest('[for-each-data]')) {
+                            if (refElement.hasAttribute('for-each-data') || refElement.closest('[for-each-data]')) {
                                 refElement.eventListeners[eventName] = (ev) => {
                                     const sprooData = ev.target.closest('[for-each-data]').sproo,
                                         result = component[attributeValue](ev, sprooData);
@@ -855,7 +855,13 @@ export default class Component extends HTMLElement {
                 }
 
                 if (selectorKey in owner.forEachIndex) {
-                    const extractedValue = selectorKey.split('.').slice(1).reduce((previous, current) => previous[current], value);
+                    let extractedValue = {}
+                    if (selectorKey.includes('.')) {
+                        extractedValue = selectorKey.split('.').slice(1).reduce((previous, current) => previous[current], value);
+                    } else {
+                        extractedValue = value[selectorKey];
+                    }
+
 
                     if (Component.isObject(extractedValue)) {
                         Component.processForEach(
