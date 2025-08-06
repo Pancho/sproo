@@ -7,7 +7,13 @@ export default class App {
 	static instance;
 	static staticRoot = '';
 	static loggerFactory;
+    /**
+     * @type {Router} The router instance
+     */
 	router = null;
+    /**
+     * @type {Http} The Http interface instance
+     */
 	http = null;
 	ready = null;
 
