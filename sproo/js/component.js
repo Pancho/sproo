@@ -682,6 +682,17 @@ export default class Component extends HTMLElement {
                     Component.parseTemplate(component, owner, template, template);
                     Component.setContext(component, owner, template, template, {...inheritedContext});
 
+                    // If the component is being if-ed, then it needs to be populated with the inherited context, or it
+                    // will get forced context update with default values from the constructor, which are either
+                    // defaulted or undefined.
+                    if (template instanceof Component) {
+                        Object.entries(inheritedContext).forEach(([key, value]) => {
+                            if (template.hasOwnProperty(key)) {
+                                template[key] = value;
+                            }
+                        })
+                    }
+
                     if (ifElement.parentElement) {
                         ifElement.parentElement.insertBefore(template, ifElement);
                         ifElement.parentElement.removeChild(ifElement);
