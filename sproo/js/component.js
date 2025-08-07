@@ -342,7 +342,7 @@ export default class Component extends HTMLElement {
         this.dispatchEvent(new CustomEvent(eventName, {
                 bubbles: true,
                 composed: true,
-                payload: obj,
+                detail: obj,
             },
         ));
     }
