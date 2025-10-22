@@ -28,7 +28,6 @@ class BazaCardComponent extends BazaComponent {
 	static tagName = 'baza-card';
 	static template = html;
 	static stylesheets = [
-		'/sproo/css/meta',
 		'/sproo/css/normalize',
 		css,
 	];

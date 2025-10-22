@@ -51,7 +51,6 @@ export default class BazaChartComponent extends BazaComponent {
 	static tagName = 'baza-chart';
 	static template = html;
 	static stylesheets = [
-		'/sproo/css/meta',
 		'/sproo/css/normalize',
 		css,
 	];

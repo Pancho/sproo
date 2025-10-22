@@ -2,7 +2,6 @@ import {uniqueBy} from './array.js';
 import {getCookie, removeCookie, setCookie} from './cookie.js';
 import CssStatic from './css.js';
 import debounce from './debounce.js';
-import DeepProxy from './deepproxy.js';
 import HtmlStatic from './html.js';
 import Loader from './loader.js';
 import {choice, randomIntArrayInRange, randomIntegerInRange, randomNumberInRange, shuffle, getRandomInt} from './random.js';
@@ -14,7 +13,6 @@ export default {
 	getCookie, removeCookie, setCookie,
 	CssStatic,
 	debounce,
-	DeepProxy,
 	HtmlStatic,
 	Loader,
 	choice, randomIntArrayInRange, randomIntegerInRange, randomNumberInRange, shuffle, getRandomInt,

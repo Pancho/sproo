@@ -137,7 +137,8 @@ export default class Http {
 	}
 
 	/**
-	 * MDN: The POST method is used to submit an entity to the specified resource, often causing a change in state or side effects on the server.
+	 * MDN: The POST method is used to submit an entity to the specified resource, often causing a change in state or side effects on
+	 * the server.
 	 * @param {string} path - The URL path for the request
 	 * @param {string|FormData|Blob|ArrayBuffer|URLSearchParams|Object} [body] - The request body data
 	 * @param {Object} [fetchOptions] - Additional fetch options to merge with the request

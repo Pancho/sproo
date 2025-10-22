@@ -9,7 +9,6 @@ export default class BazaRowComponent extends BazaComponent {
 	static tagName = 'baza-row';
 	static template = html;
 	static stylesheets = [
-		'/sproo/css/meta',
 		'/sproo/css/normalize',
 		css,
 	];

@@ -37,3 +37,7 @@ nginx
 docker-compose.yml
 baza/todo
 palette.css
+
+# Custom #
+compile.sh
+sproo-combined.txt

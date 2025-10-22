@@ -8,7 +8,7 @@ export default class Loader {
 	static templateCache = {};
 	static templateQueue = {};
 	static domParser = (new DOMParser);
-	static maxConcurrentFetches = 4;
+	static maxConcurrentFetches = 8;
 	static currentFetches = 0;
 	static fetchQueue = [];
 

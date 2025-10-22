@@ -5,11 +5,12 @@ const LEVELS = [
 		'warn',
 		'error',
 	],
-	WHITE = 0x00FFFFFF;
+	FF = 0xFF,
+	SIXTY_PERCENT = 0.6;
 
 export default class LoggerFactory {
 	[Symbol.toStringTag] = 'LoggerFactory';
-	logLevels = LEVELS;
+	logLevels = [...LEVELS];
 	worker;
 
 	getLogger(clazz) {
@@ -28,37 +29,40 @@ export default class LoggerFactory {
 
 	setLogLevel(logLevel) {
 		if (!LEVELS.includes(logLevel)) {
-			throw Error(`Invalid log level ${logLevel},  allowed levels:  ${JSON.stringify(LEVELS)}`);
+			throw Error(`Invalid log level ${ logLevel },  allowed levels:  ${ JSON.stringify(LEVELS) }`);
 		}
 
-		this.logLevels = LEVELS.splice(LEVELS.indexOf(logLevel), LEVELS.length);
+		this.logLevels = this.logLevels.splice(LEVELS.indexOf(logLevel), LEVELS.length);
 	}
 
 	static getColorStyle(color) {
 		return `color: white; background-color: ${
-			color}; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
+			color }; padding: 2px 6px; border-radius: 2px; font-size: 10px`;
 	}
 
 	static classToColor(clazz) {
 		let hash = 0,
-			i = 0;
-		const len = clazz.name.length;
+			i = 0,
+			r = 0,
+			g = 0,
+			b = 0;
+		const len = clazz.name.length,
+			toHex = (value) => Number(value).toString(16).padStart(2, '0');
 
 		for (; i < len; i += 1) {
 			hash = clazz.name.charCodeAt(i) + ((hash << 5) - hash);
 		}
 
 		// Generate RGB components with reduced brightness to ensure dark colors
-		const r = Math.floor((hash & 0xFF) * 0.6), // Limit red to 60% of max
-			g = Math.floor(((hash >> 8) & 0xFF) * 0.6), // Limit green to 60% of max
-			b = Math.floor(((hash >> 16) & 0xFF) * 0.6), // Limit blue to 60% of max
-			toHex = (value) => Number(value).toString(16).padStart(2, '0');
+		r = Math.floor((hash & FF) * SIXTY_PERCENT); // Limit red to 60% of max
+		g = Math.floor((hash >> 8 & FF) * SIXTY_PERCENT); // Limit green to 60% of max
+		b = Math.floor((hash >> 16 & FF) * SIXTY_PERCENT); // Limit blue to 60% of max
 
-		return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+		return `#${ toHex(r) }${ toHex(g) }${ toHex(b) }`;
 	}
 
 	static createWorker(fn) {
-		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${fn}`])));
+		return new Worker(URL.createObjectURL(new Blob([`onmessage = ${ fn }`])));
 	}
 }
 
@@ -90,7 +94,7 @@ class LoggerService {
 			};
 		}
 
-		return console.trace.bind(window.console, `%cTRACE: ${this.clazz.name}`, this.style);
+		return console.trace.bind(window.console, `%cTRACE: ${ this.clazz.name }`, this.style);
 	}
 
 	get debug() {
@@ -105,7 +109,7 @@ class LoggerService {
 			};
 		}
 
-		return console.debug.bind(window.console, `%cDEBUG: ${this.clazz.name}`, this.style);
+		return console.debug.bind(window.console, `%cDEBUG: ${ this.clazz.name }`, this.style);
 	}
 
 	get log() {
@@ -120,7 +124,7 @@ class LoggerService {
 			};
 		}
 
-		return console.log.bind(window.console, `%cLOG: ${this.clazz.name}`, this.style);
+		return console.log.bind(window.console, `%cLOG: ${ this.clazz.name }`, this.style);
 	}
 
 	get warn() {
@@ -135,7 +139,7 @@ class LoggerService {
 			};
 		}
 
-		return console.warn.bind(window.console, `%cWARN: ${this.clazz.name}`, this.style);
+		return console.warn.bind(window.console, `%cWARN: ${ this.clazz.name }`, this.style);
 	}
 
 	get error() {
@@ -150,7 +154,14 @@ class LoggerService {
 			};
 		}
 
-		return console.error.bind(window.console, `%cERROR: ${this.clazz.name}`, this.style);
+		return console.error.bind(window.console, `%cERROR: ${ this.clazz.name }`, this.style);
+	}
+
+	release() {
+		this.clazz = null;
+		this.style = null;
+		this.logLevels = null;
+		this.worker = null;
 	}
 
 	static postMessage(worker, clazz, level, ...args) {

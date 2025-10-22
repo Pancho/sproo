@@ -16,7 +16,6 @@ export default class BazaTableComponent extends BazaComponent {
 	static tagName = 'baza-table';
 	static template = html;
 	static stylesheets = [
-		'/sproo/css/meta',
 		'/sproo/css/normalize',
 		css,
 	];
