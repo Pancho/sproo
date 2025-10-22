@@ -252,8 +252,8 @@ export default class Component extends HTMLElement {
 					if (shouldShow && !ifDir.inserted) {
 						const clone = document.importNode(ifDir.template, true),
 							forElements = clone.querySelectorAll ? clone.querySelectorAll('[for-each]') : [],
-							bindingsBeforeCount = this.#bindings.length,
-							newBindings = this.#bindings.slice(bindingsBeforeCount);
+							bindingsBeforeCount = this.#bindings.length;
+						let newBindings = [];
 
 						for (const el of forElements) {
 							const forExpr = el.getAttribute('for-each'),
@@ -275,6 +275,7 @@ export default class Component extends HTMLElement {
 						}
 
 						this.#parseBindingsInTemplate(clone);
+						newBindings = this.#bindings.slice(bindingsBeforeCount);
 						ifDir.placeholder.parentElement.insertBefore(clone, ifDir.placeholder);
 						ifDir.inserted = clone;
 						this.#parseEventHandlers(clone);
