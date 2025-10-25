@@ -16,7 +16,7 @@ export default class Component extends HTMLElement {
 	// Private fields (ES6 private, only accessible within this class)
 	/** @type {Array<{expression: string, element: HTMLElement, update: Function}>} */
 	#bindings = [];
-	/** @type {Array<{condition: string, placeholder: Comment, template: Node, inserted: Node|null}>} */
+	/** @type {Array<{condition: string, placeholder: Comment, template: Node, inserted: Node|null, context: Object|null}>} */
 	#ifDirectives = [];
 	/** @type {Array<{itemsExpr: string, itemName: string, placeholder: Comment, template: Node}>} */
 	#forEachDirectives = [];
@@ -247,7 +247,7 @@ export default class Component extends HTMLElement {
 
 			for (const ifDir of this.#ifDirectives) {
 				try {
-					const shouldShow = this.#evaluateExpression(ifDir.condition);
+					const shouldShow = this.#evaluateExpression(ifDir.condition, ifDir.context || {});
 
 					if (shouldShow && !ifDir.inserted) {
 						const clone = document.importNode(ifDir.template, true),
@@ -433,6 +433,7 @@ export default class Component extends HTMLElement {
 				placeholder,
 				template,
 				inserted: null,
+				context: null,
 			});
 		}
 
@@ -603,15 +604,78 @@ export default class Component extends HTMLElement {
 	/**
 	 * Parses and evaluates a template in a specific context (used for for-each loops).
 	 * Immediately evaluates bindings rather than storing them for later updates.
+	 * Also processes if directives within the loop context.
 	 * @param {DocumentFragment|HTMLElement} root - The root element to parse
 	 * @param {Object<string, any>} context - The context object containing loop variables
 	 * @private
 	 */
 	#parseTemplateInContext(root, context) {
-		const iter = document.createNodeIterator(root, NodeFilter.SHOW_TEXT),
+		// First, handle if directives within this context
+		const ifElements = root.querySelectorAll ? root.querySelectorAll('[if]') : [],
 			textNodes = [];
-		let node = iter.nextNode(),
+		let iter = null,
+			node = null,
 			elements = [];
+
+		for (const el of ifElements) {
+			const condition = el.getAttribute('if'),
+				placeholder = document.createComment('if'),
+				template = document.importNode(el, true);
+			let ifDirective = null;
+
+			template.removeAttribute('if');
+
+			el.parentElement.insertBefore(placeholder, el);
+			el.remove();
+
+			ifDirective = {
+				condition,
+				placeholder,
+				template,
+				inserted: null,
+				context, // Store the loop context for this if directive
+			};
+
+			this.#ifDirectives.push(ifDirective);
+
+			// Immediately evaluate this if directive
+			try {
+				const shouldShow = this.#evaluateExpression(ifDirective.condition, ifDirective.context || {});
+
+				if (shouldShow) {
+					const clone = document.importNode(ifDirective.template, true);
+					let bindingsToUpdate = null;
+
+					ifDirective.placeholder.parentElement.insertBefore(clone, ifDirective.placeholder);
+					ifDirective.inserted = clone;
+
+					// Parse any bindings in the inserted content
+					this.#parseBindingsInTemplate(clone);
+					this.#parseEventHandlers(clone, context);
+
+					// Update any bindings in the clone
+					bindingsToUpdate = this.#bindings.filter(
+						(binding) => binding.element && clone.contains(binding.element),
+					);
+
+					for (const binding of bindingsToUpdate) {
+						try {
+							const value = this.#evaluateExpression(binding.expression, context);
+
+							binding.update(value);
+						} catch (e) {
+							// Skip if can't evaluate
+						}
+					}
+				}
+			} catch (e) {
+				// Skip if evaluation fails
+			}
+		}
+
+		// Handle text nodes
+		iter = document.createNodeIterator(root, NodeFilter.SHOW_TEXT);
+		node = iter.nextNode();
 
 		while (node) {
 			if (node.textContent.includes('{{')) {
@@ -749,18 +813,47 @@ export default class Component extends HTMLElement {
 	}
 
 	/**
-	 * Gets all reactive properties from the component.
-	 * Returns properties stored with underscore prefix (e.g., _propertyName).
-	 * @returns {Object<string, any>} Object containing all reactive properties
+	 * Gets all reactive properties and getters from the component.
+	 * Returns properties stored with underscore prefix (e.g., _propertyName) and any getters.
+	 * @returns {Object<string, any>} Object containing all reactive properties and getters
 	 * @private
 	 */
 	#getContext() {
 		const context = {};
 
+		// Get reactive properties (those with _ prefix)
 		for (const key in this) {
 			if (key.startsWith('_') && !key.startsWith('__')) {
 				context[key.substring(1)] = this[key];
 			}
+		}
+
+		// Also get properties with getters from the prototype chain
+		let proto = Object.getPrototypeOf(this);
+
+		while (proto && proto !== HTMLElement.prototype) {
+			const descriptors = Object.getOwnPropertyDescriptors(proto);
+
+			for (const [name, descriptor] of Object.entries(descriptors)) {
+				// Skip private properties, constructor, and properties already in context
+				if (name.startsWith('_') ||
+					name.startsWith('#') ||
+					name === 'constructor' ||
+					Object.prototype.hasOwnProperty.call(context, name)) {
+					continue;
+				}
+
+				// If it has a getter, evaluate it and add to context
+				if (descriptor.get && typeof descriptor.get === 'function') {
+					try {
+						context[name] = this[name];
+					} catch (e) {
+						// Skip if getter throws
+					}
+				}
+			}
+
+			proto = Object.getPrototypeOf(proto);
 		}
 
 		return context;
@@ -776,15 +869,18 @@ export default class Component extends HTMLElement {
 		const methods = {};
 		let proto = Object.getPrototypeOf(this);
 
-		while (proto && !proto.constructor.name.startsWith('HTML')) {
+		while (proto && proto !== HTMLElement.prototype) {
 			const names = Object.getOwnPropertyNames(proto);
 
 			for (const name of names) {
-				if (typeof this[name] === 'function' &&
-					name !== 'constructor' &&
-					!name.startsWith('_') &&
-					!name.startsWith('#') &&
-					!methods[name]) {
+				if (name.startsWith('_') ||
+					name.startsWith('#') ||
+					name === 'constructor' ||
+					typeof this[name] !== 'function') {
+					continue;
+				}
+
+				if (!methods[name]) {
 					methods[name] = this[name].bind(this);
 				}
 			}
@@ -1040,6 +1136,7 @@ export default class Component extends HTMLElement {
 					dir.template = null;
 					dir.placeholder = null;
 					dir.inserted = null;
+					dir.context = null;
 				}
 
 				element.#ifDirectives = [];

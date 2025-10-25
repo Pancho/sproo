@@ -36,7 +36,7 @@ export default class Router {
 
 		Router.instance = this;
 
-		this.routeRoot = `${window.location.protocol}//${window.location.host}${routeRoot}`;
+		this.routeRoot = `${ window.location.protocol }//${ window.location.host }${ routeRoot }`;
 		this.authenticationUrl = authenticationUrl;
 
 		this.#onPopStateBound = this.#onPopState.bind(this);
@@ -131,7 +131,7 @@ export default class Router {
 				result = await guard.guard(this, route, params, queryParams);
 
 			if (!guardModule?.default) {
-				console.error(`Guard module ${route.guard} does not have a default export`);
+				console.error(`Guard module ${ route.guard } does not have a default export`);
 
 				return {allowed: false};
 			}
@@ -268,7 +268,7 @@ export default class Router {
 	 * @private
 	 */
 	#buildUrl(location) {
-		return `${this.routeRoot}/${location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')}`
+		return `${ this.routeRoot }/${ location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/') }`
 			.replace(/([^:])(\/{2,})/gu, '$1/');
 	}
 
@@ -599,16 +599,17 @@ class RouterUtils {
 		}
 
 		try {
-			let module;
+			let module = null,
+				newComponent = null;
+
 			if (typeof componentOrLoader === 'function') {
 				module = await componentOrLoader(); // Lazy load
 			} else {
 				module = await import(componentOrLoader); // Eager load
 			}
-			let newComponent = null;
 
 			if (!module?.default) {
-				throw new Error(`Module ${componentOrLoader} does not have a valid default export`);
+				throw new Error(`Module ${ componentOrLoader } does not have a valid default export`);
 			}
 
 			// Register custom element if not already registered
@@ -622,7 +623,7 @@ class RouterUtils {
 
 			return newComponent;
 		} catch (error) {
-			console.error(`Failed to inject component ${componentOrLoader}:`, error);
+			console.error(`Failed to inject component ${ componentOrLoader }:`, error);
 
 			throw error;
 		}
