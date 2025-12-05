@@ -5,6 +5,7 @@ import Loader from './utils/loader.js';
 export default class App {
 	[Symbol.toStringTag] = 'App';
 	static instance;
+	static appName = '';
 	static staticRoot = '';
 	static loggerFactory;
 
@@ -31,6 +32,7 @@ export default class App {
 	/**
 	 * Creates a new App instance. Only one instance is allowed.
 	 * @param {Object} config - Application configuration
+	 * @param {string} [config.appName=''] - Application name (used for tag names)
 	 * @param {string} [config.staticRoot=''] - Root path for static assets
 	 * @param {Array<string>} [config.rootStylesheets] - Global stylesheets to load
 	 * @param {string} [config.httpEndpointStub] - HTTP endpoint configuration
@@ -56,6 +58,8 @@ export default class App {
 		}
 
 		this.#validateConfig(config);
+
+		App.appName = config.appName;
 
 		if (config.staticRoot) {
 			App.staticRoot = config.staticRoot;
@@ -92,7 +96,7 @@ export default class App {
 		}
 
 		const required = [
-				'routeRoot',
+				'appName',
 				'homePage',
 				'routes',
 			],

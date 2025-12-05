@@ -1,3 +1,7 @@
+import {camelToKebab} from './utils/text.js';
+import App from './app.js';
+
+
 export default class Router {
 	[Symbol.toStringTag] = 'Router';
 	static instance;
@@ -11,6 +15,8 @@ export default class Router {
 	authenticationUrl = null;
 
 	#onPopStateBound = null;
+	#onPageShowBound = null;
+	#onPageHideBound = null;
 	#navigating = false;
 	#navigationQueue = [];
 	#beforeNavigateCallbacks = [];
@@ -41,6 +47,13 @@ export default class Router {
 
 		this.#onPopStateBound = this.#onPopState.bind(this);
 		window.addEventListener('popstate', this.#onPopStateBound);
+
+		// Back/forward cache (bfcache) support
+		this.#onPageShowBound = this.#onPageShow.bind(this);
+		window.addEventListener('pageshow', this.#onPageShowBound);
+
+		this.#onPageHideBound = this.#onPageHide.bind(this);
+		window.addEventListener('pagehide', this.#onPageHideBound);
 
 		this.#setupHomeRoute(homePage);
 		this.#setupNotFoundRoute(notFound);
@@ -168,7 +181,12 @@ export default class Router {
 		this.#afterNavigateCallbacks = [];
 
 		window.removeEventListener('popstate', this.#onPopStateBound);
+		window.removeEventListener('pageshow', this.#onPageShowBound);
+		window.removeEventListener('pagehide', this.#onPageHideBound);
+
 		this.#onPopStateBound = null;
+		this.#onPageShowBound = null;
+		this.#onPageHideBound = null;
 
 		Router.instance = null;
 	}
@@ -451,6 +469,45 @@ export default class Router {
 	#onPopState(event) {
 		this.resolve(event.target.location.href);
 	}
+
+	/**
+	 * Handles pageshow event for bfcache restoration
+	 * @param {PageTransitionEvent} event - The pageshow event
+	 * @private
+	 */
+	#onPageShow(event) {
+		if (event.persisted) {
+			// Page was restored from bfcache (back/forward cache)
+			console.log('[Router] Page restored from bfcache');
+
+			// Re-resolve the current route to ensure everything is up to date
+			this.resolve();
+
+			// Dispatch a custom event that components can listen to
+			// This allows components to refresh time-sensitive data
+			window.dispatchEvent(new CustomEvent('bfcache-restore', {
+				detail: {
+					route: this.lastRouteResolved,
+					timestamp: Date.now(),
+				},
+			}));
+		}
+	}
+
+	/**
+	 * Handles pagehide event before bfcache entry
+	 * @param {PageTransitionEvent} event - The pagehide event
+	 * @private
+	 */
+	#onPageHide(event) {
+		if (event.persisted) {
+			// Page is about to enter bfcache
+			console.log('[Router] Page entering bfcache');
+
+			// The browser will automatically pause timers and animations
+			// Only add cleanup here if you have specific requirements
+		}
+	}
 }
 
 
@@ -600,7 +657,8 @@ class RouterUtils {
 
 		try {
 			let module = null,
-				newComponent = null;
+				newComponent = null,
+				tagName = '';
 
 			if (typeof componentOrLoader === 'function') {
 				module = await componentOrLoader(); // Lazy load
@@ -612,9 +670,11 @@ class RouterUtils {
 				throw new Error(`Module ${ componentOrLoader } does not have a valid default export`);
 			}
 
+			tagName = `${ App.appName }-${ camelToKebab(module.default.name.replace('Component', '')) }`;
+
 			// Register custom element if not already registered
-			if (!customElements.get(module.default.tagName)) {
-				customElements.define(module.default.tagName, module.default);
+			if (!customElements.get(tagName)) {
+				customElements.define(tagName, module.default);
 			}
 
 			newComponent = new module.default(...params);

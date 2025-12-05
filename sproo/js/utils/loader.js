@@ -7,7 +7,7 @@ export default class Loader {
 	static cssQueue = [];
 	static templateCache = {};
 	static templateQueue = {};
-	static domParser = (new DOMParser);
+	static domParser = new DOMParser;
 	static maxConcurrentFetches = 8;
 	static currentFetches = 0;
 	static fetchQueue = [];
@@ -45,6 +45,8 @@ export default class Loader {
 
 		if (stylesheetPath instanceof CssStatic) {
 			promiseResolve(stylesheetPath.getContent());
+
+			return;
 		}
 
 		if (Loader.cssCache[stylesheetPath]) {
@@ -82,28 +84,44 @@ export default class Loader {
 		}
 	}
 
-	static getTemplateHTML(templatePath, resolve) {
+	static getTemplateHTML(templatePath, moduleUrl, resolve) {
 		const promiseResolve = resolve || function () {
 		};
 
-		if (templatePath instanceof HtmlStatic) {
-			promiseResolve(templatePath.getContent());
+		let resolvedTemplatePath = '';
+
+		if (templatePath === null) {
+			resolve();
 		}
 
-		if (Loader.templateCache[templatePath]) {
-			promiseResolve(Loader.templateCache[templatePath].querySelector('template').content.cloneNode(true));
-		} else if (Loader.templateQueue[templatePath]) {
-			Loader.templateQueue[templatePath].push(promiseResolve);
+		if (templatePath instanceof HtmlStatic) {
+			promiseResolve(templatePath.getContent());
+
+			return;
+		}
+
+		if (typeof templatePath === 'undefined') {
+			const url = new URL(moduleUrl);
+
+			resolvedTemplatePath = url.pathname.replace('.js', '.html');
 		} else {
-			if (!Loader.templateQueue[templatePath]) {
-				Loader.templateQueue[templatePath] = [];
+			resolvedTemplatePath = templatePath;
+		}
+
+		if (Loader.templateCache[resolvedTemplatePath]) {
+			promiseResolve(Loader.templateCache[resolvedTemplatePath].querySelector('template').content.cloneNode(true));
+		} else if (Loader.templateQueue[resolvedTemplatePath]) {
+			Loader.templateQueue[resolvedTemplatePath].push(promiseResolve);
+		} else {
+			if (!Loader.templateQueue[resolvedTemplatePath]) {
+				Loader.templateQueue[resolvedTemplatePath] = [];
 			}
 
-			Loader.templateQueue[templatePath].push(promiseResolve);
+			Loader.templateQueue[resolvedTemplatePath].push(promiseResolve);
 
-			Loader.#queueFetch(() => fetch(`${ templatePath.toLowerCase() }.html`, {method: 'GET'}).then((response) => {
+			Loader.#queueFetch(() => fetch(resolvedTemplatePath, {method: 'GET'}).then((response) => {
 				if (!response.ok) {
-					throw new Error(`Failed to load template from ${ templatePath }: ${ response.status } ${ response.statusText }`);
+					throw new Error(`Failed to load template from ${ resolvedTemplatePath }: ${ response.status } ${ response.statusText }`);
 				}
 
 				return response.text();
@@ -111,8 +129,8 @@ export default class Loader {
 				const node = Loader.domParser.parseFromString(`<template>${ html }</template>`, 'text/html'),
 					template = node.querySelector('template');
 
-				Loader.templateCache[templatePath] = node;
-				Loader.templateQueue[templatePath].forEach((queuedResolve) => {
+				Loader.templateCache[resolvedTemplatePath] = node;
+				Loader.templateQueue[resolvedTemplatePath].forEach((queuedResolve) => {
 					try {
 						queuedResolve(template.content.cloneNode(true));
 					} catch (error) {

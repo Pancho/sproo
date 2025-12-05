@@ -1,10 +1,53 @@
 import App from './app.js';
 import Loader from './utils/loader.js';
-import {kebabToCamel} from './utils/text.js';
+import {camelToKebab, kebabToCamel} from './utils/text.js';
 
 
 const TEXT_NODE_TAGS = /(\{\{.+?\}\})/u,
-	SIMPLE_PROPERTY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$.?]*$/u;
+	SIMPLE_PROPERTY_REGEX = /^[a-zA-Z_$][a-zA-Z0-9_$.?]*$/u,
+	EVALUATION_ERROR = Symbol('EVALUATION_ERROR'),
+	/**
+	 * Property bindings for elements where setting attributes isn't sufficient.
+	 * These elements need both property AND attribute updates for proper synchronization.
+	 */
+	PROPERTY_BINDINGS = {
+		'value': (element, value) => {
+			// For input, textarea, select - set the live property value
+			if ([
+				'INPUT',
+				'TEXTAREA',
+				'SELECT',
+			].includes(element.tagName)) {
+				element.value = value ?? '';
+			}
+		},
+		'checked': (element, value) => {
+			// For checkbox and radio inputs - set the checked state
+			if (element.tagName === 'INPUT' &&
+				(element.type === 'checkbox' || element.type === 'radio')) {
+				element.checked = Boolean(value);
+			}
+		},
+		'selected': (element, value) => {
+			// For option elements - set the selected state
+			if (element.tagName === 'OPTION') {
+				element.selected = Boolean(value);
+			}
+		},
+		'disabled': (element, value) => {
+			// For any element that can be disabled
+			element.disabled = Boolean(value);
+		},
+		'readonly': (element, value) => {
+			// For inputs that can be readonly
+			if ([
+				'INPUT',
+				'TEXTAREA',
+			].includes(element.tagName)) {
+				element.readOnly = Boolean(value);
+			}
+		},
+	};
 
 /**
  * Component - Clean implementation with proper cleanup and sproo-prefixed internal properties
@@ -12,6 +55,11 @@ const TEXT_NODE_TAGS = /(\{\{.+?\}\})/u,
  */
 export default class Component extends HTMLElement {
 	[Symbol.toStringTag] = 'Component';
+
+	// Performance tracking
+	static performanceTracking = true;
+	static performanceLog = [];
+	static performanceThreshold = 5;
 
 	// Private fields (ES6 private, only accessible within this class)
 	/** @type {Array<{expression: string, element: HTMLElement, update: Function}>} */
@@ -31,6 +79,20 @@ export default class Component extends HTMLElement {
 	/** @type {boolean} */
 	#isDestroyed = false;
 
+	// NEW: Dependency tracking for optimized updates
+	/** @type {Map<Object, Set<string>>} */
+	#dependencyMap = new Map; // binding -> Set<propertyNames>
+	/** @type {Map<string, Set<Object>>} */
+	#bindingsByProperty = new Map; // propertyName -> Set<bindings>
+	/** @type {Set<string>} */
+	#propertiesToUpdate = new Set; // Track which properties changed
+	/** @type {Map<Object, Set<string>>} */
+	#ifDirectiveDeps = new Map; // ifDirective -> Set<propertyNames>
+	/** @type {Map<Object, Set<string>>} */
+	#forEachDirectiveDeps = new Map; // forEachDirective -> Set<propertyNames>
+	/** @type {boolean} */
+	#forEachReconciled = false; // Track if any for-each was reconciled in this update cycle
+
 	// Public fields
 	/** @type {Promise<void>} */
 	templateLoaded;
@@ -47,12 +109,10 @@ export default class Component extends HTMLElement {
 		super();
 		this.attachShadow({mode: 'open'});
 
-		const templateReady = new Promise((resolve) => {
-				if (this.constructor.template) {
-					Loader.getTemplateHTML(this.constructor.template, resolve);
-				} else {
-					resolve();
-				}
+
+		const moduleUrl = this.constructor.moduleUrl,
+			templateReady = new Promise((resolve) => {
+				Loader.getTemplateHTML(this.constructor.template, moduleUrl, resolve);
 			}),
 			styleSheetPromises = [],
 			importPromises = [];
@@ -70,13 +130,13 @@ export default class Component extends HTMLElement {
 			}
 		}
 
+		this.app = App.instance;
+
 		if (this.constructor.registerComponents) {
 			for (const component of this.constructor.registerComponents) {
-				importPromises.push(import(component));
+				importPromises.push(import(`${ this.app.constructor.staticRoot }${ component }`));
 			}
 		}
-
-		this.app = App.instance;
 
 		if (App.loggerFactory) {
 			this.logger = App.loggerFactory.getLogger(this.constructor);
@@ -117,11 +177,11 @@ export default class Component extends HTMLElement {
 						}
 
 						const undeclaredModules = componentModules.filter(
-							(m) => !customElements.get(m.default.tagName),
+							(m) => !customElements.get(this.#resolveTagName(m.default)),
 						);
 
 						for (const module of undeclaredModules) {
-							customElements.define(module.default.tagName, module.default);
+							customElements.define(this.#resolveTagName(module.default), module.default);
 						}
 
 						this.onTemplateLoaded();
@@ -133,6 +193,15 @@ export default class Component extends HTMLElement {
 				}
 			});
 		});
+	}
+
+	/**
+	 * Resolves tag name from app config (appName) and component class name
+	 * @private
+	 * @param clazz
+	 */
+	#resolveTagName(clazz) {
+		return `${ this.app.constructor.appName }-${ camelToKebab(clazz.name.replace('Component', '')) }`;
 	}
 
 	/**
@@ -163,9 +232,12 @@ export default class Component extends HTMLElement {
 				}
 
 				if (this.templateLoaded && !this.#isUpdating) {
+					// Track which property changed for selective updates
+					this.#propertiesToUpdate.add(propName);
+
 					this.#updatePromise = this.templateLoaded.then(() => {
 						if (this.isConnected && !this.#isDestroyed) {
-							this.#updateAllBindings();
+							this.#updateChangedBindings();
 						}
 					});
 				}
@@ -183,13 +255,14 @@ export default class Component extends HTMLElement {
 			for (const [key, value] of Object.entries(changes)) {
 				if (Object.prototype.hasOwnProperty.call(this, `_${ key }`)) {
 					this[`_${ key }`] = value;
+					this.#propertiesToUpdate.add(key);
 				}
 			}
 		}
 
 		this.#updatePromise = Promise.resolve().then(() => {
 			if (!this.#isDestroyed) {
-				this.#updateAllBindings();
+				this.#updateChangedBindings();
 			}
 		});
 	}
@@ -207,6 +280,630 @@ export default class Component extends HTMLElement {
 			await this.#updatePromise;
 		}
 	}
+
+	/**
+	 * NEW: Parse an expression to extract property dependencies.
+	 * @private
+	 */
+	#extractDependencies(expression) {
+		const dependencies = new Set;
+		const propertyPattern = /\b([a-zA-Z_$][a-zA-Z0-9_$]*(?:(?:\.|\.\ ?\[|\?\.)[a-zA-Z0-9_$\[\]'"]+)*)/g;
+		let match;
+
+		const keywords = new Set([
+			'true',
+			'false',
+			'null',
+			'undefined',
+			'this',
+			'return',
+			'if',
+			'else',
+			'for',
+			'while',
+			'function',
+			'const',
+			'let',
+			'var',
+			'new',
+			'typeof',
+			'instanceof',
+			'delete',
+			'void',
+			'in',
+			'of',
+			'break',
+			'continue',
+			'switch',
+			'case',
+			'default',
+			'try',
+			'catch',
+			'finally',
+			'throw',
+			'class',
+			'extends',
+			'static',
+			'async',
+			'await',
+		]);
+
+		while ((match = propertyPattern.exec(expression)) !== null) {
+			const propPath = match[1];
+			const rootProp = propPath.split(/[.\[?]/)[0];
+
+			if (!keywords.has(rootProp) && rootProp.length > 0) {
+				dependencies.add(rootProp);
+			}
+		}
+
+		return dependencies;
+	}
+
+	#registerBinding(binding) {
+		const dependencies = this.#extractDependencies(binding.expression);
+
+		this.#dependencyMap.set(binding, dependencies);
+
+		for (const prop of dependencies) {
+			if (!this.#bindingsByProperty.has(prop)) {
+				this.#bindingsByProperty.set(prop, new Set);
+			}
+
+			this.#bindingsByProperty.get(prop).add(binding);
+		}
+	}
+
+	#unregisterBinding(binding) {
+		const dependencies = this.#dependencyMap.get(binding);
+
+		if (dependencies) {
+			for (const prop of dependencies) {
+				this.#bindingsByProperty.get(prop)?.delete(binding);
+			}
+
+			this.#dependencyMap.delete(binding);
+		}
+	}
+
+	#registerIfDirective(directive) {
+		const dependencies = this.#extractDependencies(directive.condition);
+
+		this.#ifDirectiveDeps.set(directive, dependencies);
+	}
+
+	#registerForEachDirective(directive) {
+		const dependencies = this.#extractDependencies(directive.itemsExpr);
+
+		this.#forEachDirectiveDeps.set(directive, dependencies);
+	}
+
+	/**
+	 * Gets the loop context for a node by walking up the DOM tree.
+	 * For nested for-each loops, placeholders may have their parent context stored directly.
+	 * @param {Node} node - The node to get context for
+	 * @returns {Object|null} The loop context or null
+	 * @private
+	 */
+	#getLoopContext(node) {
+		if (!node) {
+			return null;
+		}
+
+		// CRITICAL: Check if the node itself has a loop context
+		// This handles both elements AND placeholders (for nested loops)
+		if (node.sprooLoopContext) {
+			return node.sprooLoopContext;
+		}
+
+		// For text nodes or elements, walk up to find parent element with context
+		let parent = node.parentElement || node.parentNode;
+
+		while (parent) {
+			if (parent.sprooLoopContext) {
+				return parent.sprooLoopContext;
+			}
+
+			parent = parent.parentElement || parent.parentNode;
+		}
+
+		return null;
+	}
+
+	#areItemsEqual(oldItem, newItem) {
+		if (oldItem === newItem) {
+			return true;
+		}
+
+		if (typeof oldItem === 'object' && typeof newItem === 'object') {
+			if (oldItem === null || newItem === null) {
+				return oldItem === newItem;
+			}
+
+			try {
+				return JSON.stringify(oldItem) === JSON.stringify(newItem);
+			} catch (e) {
+				return false;
+			}
+		}
+
+		return false;
+	}
+
+	#updateElementBindings(element, context) {
+		const perfTotal = this.#perfStart('Update Element Bindings');
+		let bindingCount = 0;
+		let errorCount = 0;
+		let updatedCount = 0;
+
+		// CRITICAL: Filter out disconnected bindings BEFORE updating
+		// This prevents stale bindings from evaluating with old contexts
+		this.#bindings = this.#bindings.filter((binding) => {
+			if (!binding.element || !binding.element.isConnected) {
+				this.#unregisterBinding(binding);
+				binding.update = null;
+				binding.element = null;
+
+				return false;
+			}
+
+			return true;
+		});
+
+		for (const binding of this.#bindings) {
+			if (binding.element &&
+				(binding.element === element || element.contains(binding.element))) {
+				const bindingContext = this.#getLoopContext(binding.element) || context;
+				const value = this.#evaluateExpression(binding.expression, bindingContext);
+
+				// Always call update - let it handle EVALUATION_ERROR
+				if (binding.update) {
+					binding.update(value);
+					updatedCount++;
+				}
+
+				if (value === EVALUATION_ERROR) {
+					errorCount++;
+				}
+
+				bindingCount++;
+			}
+		}
+
+		this.#perfEnd(perfTotal, {
+			totalBindings: bindingCount,
+			updatedBindings: updatedCount,
+			errors: errorCount,
+		});
+	}
+
+	#reconcileForEachItems(forDir, newItems) {
+		// Set flag to indicate a for-each was reconciled
+		this.#forEachReconciled = true;
+
+		// CRITICAL FIX: Clear dependency tracking for any nested for-each loops that depend on loop variables
+		// This ensures they always update when parent reconciles
+		for (const nestedForDir of this.#forEachDirectives) {
+			const deps = this.#forEachDirectiveDeps.get(nestedForDir);
+
+			if (deps && deps.size > 0) {
+				// Check if ALL dependencies are loop variables (not top-level properties)
+				const allDepsAreLoopVars = Array.from(deps).every((dep) =>
+					!Object.prototype.hasOwnProperty.call(this, `_${ dep }`),
+				);
+
+				if (allDepsAreLoopVars) {
+					// Clear the dependencies so this nested loop always updates
+					this.#forEachDirectiveDeps.set(nestedForDir, new Set);
+				}
+			}
+		}
+
+		const perfTotal = this.#perfStart('ForEach Reconciliation Total');
+		const perfDetail = {
+			itemsExpr: forDir.itemsExpr,
+			oldCount: 0,
+			newCount: newItems ? newItems.length : 0,
+			strategy: 'unknown',
+		};
+
+		const existingElements = [];
+		const perfCount = this.#perfStart('ForEach - Count Existing');
+		let sibling = forDir.placeholder.previousElementSibling;
+
+		while (sibling && sibling.sprooForEachItem) {
+			existingElements.unshift(sibling);
+			sibling = sibling.previousElementSibling;
+		}
+
+		this.#perfEnd(perfCount, {count: existingElements.length});
+		perfDetail.oldCount = existingElements.length;
+
+		if (existingElements.length === newItems.length) {
+			const perfUpdateInPlace = this.#perfStart('ForEach - Update In Place');
+			let needsRecreation = false;
+			const elementsToUpdate = []; // Track which elements need binding updates
+
+			for (let i = 0; i < newItems.length; i++) {
+				const element = existingElements[i];
+				const item = newItems[i];
+
+				if (!element.sprooLoopContext) {
+					needsRecreation = true;
+
+					break;
+				}
+
+				const oldItem = element.sprooLoopContext[forDir.itemName];
+				const itemsEqual = this.#areItemsEqual(oldItem, item);
+
+				if (!itemsEqual) {
+					element.sprooLoopContext[forDir.itemName] = item;
+					element.sprooLoopContext.index = i;
+
+					// CRITICAL FIX: Update nested for-each placeholders' parent context
+					this.#updateNestedPlaceholderContexts(element, element.sprooLoopContext);
+
+					// Mark this element as needing binding updates
+					elementsToUpdate.push(element);
+				}
+			}
+
+			if (!needsRecreation) {
+				this.#perfEnd(perfUpdateInPlace, {
+					itemsUpdated: elementsToUpdate.length,
+					recreated: false,
+				});
+				perfDetail.strategy = 'update-in-place';
+
+				// First, update nested for-each loops for elements that changed
+				for (const element of elementsToUpdate) {
+					this.#forceUpdateNestedForEach(element);
+				}
+
+				// CRITICAL: Update bindings for ALL elements to ensure fresh data
+				// This catches both direct changes and nested changes
+				for (const element of existingElements) {
+					this.#updateElementBindings(element, element.sprooLoopContext);
+				}
+
+				this.#perfEnd(perfTotal, perfDetail);
+
+				return;
+			}
+
+			this.#perfEnd(perfUpdateInPlace, {
+				itemsUpdated: 0,
+				recreated: true,
+			});
+			perfDetail.strategy = 'recreate-all';
+		}
+
+		const perfRemove = this.#perfStart('ForEach - Remove All');
+
+		// CRITICAL FIX: Before removing elements, clean up their nested for-each directives
+		// This prevents disconnected placeholders from staying in #forEachDirectives
+		for (const el of existingElements) {
+			// Find and remove nested directives that belong to this element
+			this.#forEachDirectives = this.#forEachDirectives.filter((dir) => {
+				// Keep directive if its placeholder is NOT inside this element
+				const shouldKeep = !el.contains || !el.contains(dir.placeholder);
+
+				return shouldKeep;
+			});
+
+			if (el.sprooLoopContext) {
+				el.sprooLoopContext = null;
+			}
+
+			el.sprooForEachItem = null;
+			Component.#unloadElement(el);
+		}
+
+		this.#perfEnd(perfRemove, {removed: existingElements.length});
+
+		const perfCreate = this.#perfStart('ForEach - Create All');
+
+		for (const [index, item] of newItems.entries()) {
+			const perfClone = this.#perfStart('ForEach - Clone Template');
+			const clone = document.importNode(forDir.template, true);
+
+			this.#perfEnd(perfClone);
+			clone.sprooForEachItem = true;
+			clone.sprooLoopContext = {
+				[forDir.itemName]: item,
+				index,
+			};
+			forDir.placeholder.parentElement.insertBefore(clone, forDir.placeholder);
+			const perfParse = this.#perfStart('ForEach - Parse Template');
+
+			this.#parseTemplateInContext(clone, clone.sprooLoopContext);
+			this.#perfEnd(perfParse);
+		}
+
+		this.#perfEnd(perfCreate, {created: newItems.length});
+		perfDetail.created = newItems.length;
+
+		// Collect newly created elements for binding updates
+		const newElements = [];
+		let sibling2 = forDir.placeholder.previousElementSibling;
+
+		while (sibling2 && sibling2.sprooForEachItem) {
+			newElements.unshift(sibling2);
+			sibling2 = sibling2.previousElementSibling;
+		}
+
+		// Force update nested for-each loops after reconciliation
+		for (const element of newElements) {
+			this.#forceUpdateNestedForEach(element);
+		}
+
+		// CRITICAL: Update all bindings in newly created elements after nested reconciliation
+		for (const element of newElements) {
+			this.#updateElementBindings(element, element.sprooLoopContext);
+		}
+
+		this.#perfEnd(perfTotal, perfDetail);
+	}
+
+	// Helper to force-update nested for-each loops
+	#forceUpdateNestedForEach(parentElement) {
+		for (const forDir of this.#forEachDirectives) {
+			// Check if this for-each's placeholder is inside the parent element
+			if (parentElement.contains && parentElement.contains(forDir.placeholder)) {
+				try {
+					const context = this.#getLoopContext(forDir.placeholder) || {};
+					const items = this.#evaluateExpression(forDir.itemsExpr, context);
+
+					if (Array.isArray(items)) {
+						this.#reconcileForEachItems(forDir, items);
+					}
+				} catch (e) {
+					// Skip
+				}
+			}
+		}
+	}
+
+	// CRITICAL FIX: Helper to update nested for-each placeholders' parent context
+	// This ensures nested loops can access updated parent loop variables
+	#updateNestedPlaceholderContexts(parentElement, newContext) {
+		for (const forDir of this.#forEachDirectives) {
+			// Check if this for-each's placeholder is inside the parent element
+			if (parentElement.contains && parentElement.contains(forDir.placeholder)) {
+				// Update the placeholder's stored parent context
+				// This is crucial for nested loops to evaluate with fresh parent data
+				if (forDir.placeholder.sprooLoopContext) {
+					// Merge the new parent context, preserving any nested loop variables
+					forDir.placeholder.sprooLoopContext = {
+						...forDir.placeholder.sprooLoopContext,
+						...newContext,
+					};
+				} else {
+					forDir.placeholder.sprooLoopContext = newContext;
+				}
+			}
+		}
+	}
+
+	#updateChangedBindings() {
+		if (this.#isUpdating || this.#isDestroyed) {
+			return;
+		}
+
+		this.#isUpdating = true;
+
+		try {
+			this.onBeforeUpdate();
+
+			const bindingsToUpdate = new Set;
+			const changedProps = Array.from(this.#propertiesToUpdate);
+
+			for (const changedProp of changedProps) {
+				const affectedBindings = this.#bindingsByProperty.get(changedProp);
+
+				if (affectedBindings) {
+					for (const binding of affectedBindings) {
+						bindingsToUpdate.add(binding);
+					}
+				}
+			}
+
+			this.#propertiesToUpdate.clear();
+
+			this.#bindings = this.#bindings.filter((binding) => {
+				if (binding.element && !binding.element.isConnected) {
+					this.#unregisterBinding(binding);
+					binding.update = null;
+					binding.element = null;
+
+					return false;
+				}
+
+				return true;
+			});
+
+			for (const binding of bindingsToUpdate) {
+				if (!this.#bindings.includes(binding)) {
+					continue;
+				}
+
+				try {
+					const context = this.#getLoopContext(binding.element) || {};
+					const value = this.#evaluateExpression(binding.expression, context);
+
+					binding.update(value);
+				} catch (e) {
+					// Skip
+				}
+			}
+
+			this.#updateDirectivesSelectively(changedProps);
+
+			const currentChildren = Array.from(this.shadowRoot.querySelectorAll('*'))
+				.filter((el) => el instanceof Component && el !== this);
+
+			this.#childComponents = this.#childComponents.filter((child) =>
+				currentChildren.includes(child) && child.isConnected,
+			);
+
+			for (const child of currentChildren) {
+				if (child.isConnected && child.templateLoaded) {
+					this.#setChildProperties(child);
+				}
+			}
+
+			this.onAfterUpdate();
+		} finally {
+			this.#isUpdating = false;
+		}
+	}
+
+	#updateDirectivesSelectively(changedProps) {
+		const needsUpdate = (deps, itemsExpr) => {
+			if (!deps || deps.size === 0) {
+				return true;
+			}
+
+			// If this for-each depends only on properties that aren't top-level (i.e., loop variables),
+			// and any for-each was reconciled, force update
+			if (this.#forEachReconciled) {
+				const hasOnlyLoopVarDeps = Array.from(deps).every((dep) =>
+					// Check if this dependency is a loop variable (not a top-level property)
+					 !Object.prototype.hasOwnProperty.call(this, `_${ dep }`)
+				);
+
+				if (hasOnlyLoopVarDeps) {
+					return true;
+				}
+			}
+
+			return changedProps.some((prop) => deps.has(prop));
+		};
+
+		for (const ifDir of this.#ifDirectives) {
+			const deps = this.#ifDirectiveDeps.get(ifDir);
+
+			if (!needsUpdate(deps, 'if')) {
+				continue;
+			}
+
+			try {
+				const shouldShow = this.#evaluateExpression(ifDir.condition, ifDir.context || {});
+				const show = shouldShow !== EVALUATION_ERROR && Boolean(shouldShow);
+
+				if (show && !ifDir.inserted) {
+					const clone = document.importNode(ifDir.template, true);
+					const forElements = clone.querySelectorAll ? clone.querySelectorAll('[for-each]') : [];
+					const bindingsBeforeCount = this.#bindings.length;
+					let newBindings = [];
+
+					for (const el of forElements) {
+						const forExpr = el.getAttribute('for-each');
+						const [itemName, itemsExpr] = forExpr.split(' in ').map((s) => s.trim());
+						const placeholder = document.createComment('for-each');
+						const template = document.importNode(el, true);
+
+						template.removeAttribute('for-each');
+						el.parentElement.insertBefore(placeholder, el);
+						el.remove();
+
+						const forDir = {
+							itemsExpr,
+							itemName,
+							placeholder,
+							template,
+						};
+
+						this.#forEachDirectives.push(forDir);
+						this.#registerForEachDirective(forDir);
+
+						try {
+							placeholder.sprooLoopContext = ifDir.context;
+							const items = this.#evaluateExpression(itemsExpr, ifDir.context || {});
+
+							if (Array.isArray(items)) {
+								this.#reconcileForEachItems(forDir, items);
+							}
+						} catch (e) {
+							console.warn(`[Sproo] For-each in if directive evaluation error: "${ itemsExpr }"`, e);
+						}
+					}
+
+					this.#parseBindingsInTemplate(clone);
+					newBindings = this.#bindings.slice(bindingsBeforeCount);
+					ifDir.placeholder.parentElement.insertBefore(clone, ifDir.placeholder);
+					ifDir.inserted = clone;
+					this.#parseEventHandlers(clone);
+
+					for (const binding of newBindings) {
+						if (binding.element && clone.contains(binding.element)) {
+							try {
+								const context = this.#getLoopContext(binding.element) || {};
+								const value = this.#evaluateExpression(binding.expression, context);
+
+								binding.update(value);
+							} catch (e) {
+								// Skip
+							}
+						}
+					}
+
+					if (clone instanceof Component) {
+						this.#childComponents.push(clone);
+						clone.templateLoaded.then(() => {
+							if (clone.isConnected) {
+								this.#setChildProperties(clone);
+							}
+						});
+					}
+				} else if (!show && ifDir.inserted) {
+					Component.#unloadElement(ifDir.inserted);
+					ifDir.inserted = null;
+				}
+			} catch (e) {
+				// Skip
+			}
+		}
+
+		for (const forDir of this.#forEachDirectives) {
+			// CRITICAL FIX: Skip directives with disconnected placeholders
+			// These are stale directives from removed parent loop items
+			if (!forDir.placeholder || !forDir.placeholder.isConnected) {
+				continue;
+			}
+
+			const deps = this.#forEachDirectiveDeps.get(forDir);
+
+			if (!needsUpdate(deps, forDir.itemsExpr)) {
+				continue;
+			}
+
+			try {
+				// Get loop context from the placeholder's parent for nested loops
+				const context = this.#getLoopContext(forDir.placeholder) || {};
+				const items = this.#evaluateExpression(forDir.itemsExpr, context);
+
+				if (!Array.isArray(items)) {
+					continue;
+				}
+
+				this.#reconcileForEachItems(forDir, items);
+			} catch (e) {
+				// Skip
+			}
+		}
+
+		// CRITICAL FIX: Clean up disconnected directives at end of update cycle
+		// This prevents memory leaks from accumulating stale directives
+		this.#forEachDirectives = this.#forEachDirectives.filter((dir) =>
+			dir.placeholder && dir.placeholder.isConnected,
+		);
+
+		// Reset the flag after all for-each directives have been processed
+		this.#forEachReconciled = false;
+	}
+
 
 	/**
 	 * Updates all data bindings, processes directives (if/for-each), and updates child components.
@@ -236,20 +933,23 @@ export default class Component extends HTMLElement {
 
 			for (const binding of this.#bindings) {
 				try {
-					const context = binding.element?.sprooLoopContext || {},
+					const context = this.#getLoopContext(binding.element) || {},
 						value = this.#evaluateExpression(binding.expression, context);
 
 					binding.update(value);
 				} catch (e) {
-					// Silently skip bindings that can't be evaluated yet
+					// Log error and clear stale data - Vue/Angular-like behavior
+					console.warn(`[Sproo] Binding evaluation error: "${ binding.expression }"`, e);
+					binding.update(null);
 				}
 			}
 
 			for (const ifDir of this.#ifDirectives) {
 				try {
 					const shouldShow = this.#evaluateExpression(ifDir.condition, ifDir.context || {});
+					const show = shouldShow !== EVALUATION_ERROR && Boolean(shouldShow);
 
-					if (shouldShow && !ifDir.inserted) {
+					if (show && !ifDir.inserted) {
 						const clone = document.importNode(ifDir.template, true),
 							forElements = clone.querySelectorAll ? clone.querySelectorAll('[for-each]') : [],
 							bindingsBeforeCount = this.#bindings.length;
@@ -283,12 +983,14 @@ export default class Component extends HTMLElement {
 						for (const binding of newBindings) {
 							if (binding.element && clone.contains(binding.element)) {
 								try {
-									const context = binding.element?.sprooLoopContext || {},
+									const context = this.#getLoopContext(binding.element) || {},
 										value = this.#evaluateExpression(binding.expression, context);
 
 									binding.update(value);
 								} catch (e) {
-									// Skip if can't evaluate
+									// Log error and clear stale data
+									console.warn(`[Sproo] If directive binding evaluation error: "${ binding.expression }"`, e);
+									binding.update(null);
 								}
 							}
 						}
@@ -301,12 +1003,18 @@ export default class Component extends HTMLElement {
 								}
 							});
 						}
-					} else if (!shouldShow && ifDir.inserted) {
+					} else if (!show && ifDir.inserted) {
 						Component.#unloadElement(ifDir.inserted);
 						ifDir.inserted = null;
 					}
 				} catch (e) {
-					// Skip if directive evaluation fails
+					// Log error and clean up inserted content
+					console.warn(`[Sproo] If directive evaluation error: "${ ifDir.condition }"`, e);
+
+					if (ifDir.inserted) {
+						Component.#unloadElement(ifDir.inserted);
+						ifDir.inserted = null;
+					}
 				}
 			}
 
@@ -348,7 +1056,8 @@ export default class Component extends HTMLElement {
 						this.#parseTemplateInContext(clone, clone.sprooLoopContext);
 					}
 				} catch (e) {
-					// Skip if for-each evaluation fails
+					// Log error for for-each evaluation failures
+					console.warn(`[Sproo] For-each evaluation error: "${ forDir.itemsExpr }"`, e);
 				}
 			}
 
@@ -380,14 +1089,18 @@ export default class Component extends HTMLElement {
 		const attrs = childComponent.getAttributeNames ? childComponent.getAttributeNames() : [];
 
 		for (const attr of attrs) {
-			if (attr.startsWith('[') && attr.endsWith(']')) {
-				const propName = kebabToCamel(attr.slice(1, -1)),
+			// Component property binding: :my-prop="value"
+			if (attr.startsWith(':')) {
+				const propName = kebabToCamel(attr.slice(1)),
 					expression = childComponent.getAttribute(attr);
 
 				try {
 					const value = this.#evaluateExpression(expression);
+					const hasBacking = Object.prototype.hasOwnProperty.call(childComponent, `_${ propName }`);
 
-					if (Object.prototype.hasOwnProperty.call(childComponent, `_${ propName }`)) {
+					if (hasBacking) {
+						const oldValue = childComponent[`_${ propName }`];
+
 						childComponent[`_${ propName }`] = value;
 
 						if (childComponent.isConnected) {
@@ -397,7 +1110,7 @@ export default class Component extends HTMLElement {
 						childComponent[propName] = value;
 					}
 				} catch (e) {
-					// Skip if can't evaluate
+					console.error('[DEBUG 111-ERROR] Failed to evaluate expression:', expression, e);
 				}
 			}
 		}
@@ -428,13 +1141,16 @@ export default class Component extends HTMLElement {
 			el.parentElement.insertBefore(placeholder, el);
 			el.remove();
 
-			this.#ifDirectives.push({
+			const directive = {
 				condition,
 				placeholder,
 				template,
 				inserted: null,
 				context: null,
-			});
+			};
+
+			this.#ifDirectives.push(directive);
+			this.#registerIfDirective(directive); // NEW: Register dependencies
 		}
 
 		forElements = root.querySelectorAll('[for-each]');
@@ -454,12 +1170,15 @@ export default class Component extends HTMLElement {
 			el.parentElement.insertBefore(placeholder, el);
 			el.remove();
 
-			this.#forEachDirectives.push({
+			const directive = {
 				itemsExpr,
 				itemName,
 				placeholder,
 				template,
-			});
+			};
+
+			this.#forEachDirectives.push(directive);
+			this.#registerForEachDirective(directive); // NEW: Register dependencies
 		}
 
 		childComponents = Array.from(root.querySelectorAll('*')).filter((el) => el instanceof Component);
@@ -491,6 +1210,80 @@ export default class Component extends HTMLElement {
 			const attrs = el.getAttributeNames ? el.getAttributeNames() : [];
 
 			for (const attr of attrs) {
+				if (attr.startsWith(':')) {
+					const actualAttr = attr.slice(1);
+					const expression = el.getAttribute(attr);
+
+					if (actualAttr === 'innerHTML') {
+						const binding = {
+							expression,
+							element: el,
+							update: (value) => {
+								if (value === EVALUATION_ERROR) {
+									el.innerHTML = '';
+								} else {
+									el.innerHTML = value ?? '';
+								}
+							},
+						};
+
+						this.#bindings.push(binding);
+						this.#registerBinding(binding);
+					} else if (actualAttr.startsWith('class.')) {
+						const className = actualAttr.substring(6);
+
+						const binding = {
+							expression,
+							element: el,
+							update: (value) => {
+								if (value === EVALUATION_ERROR || !value) {
+									el.classList.remove(className);
+								} else {
+									el.classList.add(className);
+								}
+							},
+						};
+
+						this.#bindings.push(binding);
+						this.#registerBinding(binding);
+					} else {
+						const binding = {
+							expression,
+							element: el,
+							update: (value) => {
+								if (value === EVALUATION_ERROR) {
+									el.removeAttribute(actualAttr);
+
+									// Clear property as well if it needs special handling
+									if (PROPERTY_BINDINGS[actualAttr]) {
+										PROPERTY_BINDINGS[actualAttr](el, '');
+									}
+								} else if (value === null || typeof value === 'undefined') {
+									el.removeAttribute(actualAttr);
+
+									// Clear property as well if it needs special handling
+									if (PROPERTY_BINDINGS[actualAttr]) {
+										PROPERTY_BINDINGS[actualAttr](el, '');
+									}
+								} else {
+									// Set property first if special handling is needed
+									if (PROPERTY_BINDINGS[actualAttr]) {
+										PROPERTY_BINDINGS[actualAttr](el, value);
+									}
+
+									// Always set the attribute as well
+									el.setAttribute(actualAttr, value);
+								}
+							},
+						};
+
+						this.#bindings.push(binding);
+						this.#registerBinding(binding);
+					}
+
+					continue;
+				}
+
 				if (!attr.startsWith('[') || !attr.endsWith(']')) {
 					continue;
 				}
@@ -498,49 +1291,22 @@ export default class Component extends HTMLElement {
 				const expression = el.getAttribute(attr),
 					bindingAttr = attr.slice(1, -1);
 
-				if (bindingAttr.startsWith('attr.')) {
-					const actualAttr = bindingAttr.substring(5);
+				const propName = kebabToCamel(bindingAttr);
 
-					this.#bindings.push({
-						expression,
-						element: el,
-						update: (value) => {
-							if (value === null || typeof value === 'undefined') {
-								el.removeAttribute(actualAttr);
-							} else {
-								el.setAttribute(actualAttr, value);
-							}
-						},
-					});
-				} else if (bindingAttr.startsWith('style.')) {
-					const styleProp = bindingAttr.substring(6);
-
-					this.#bindings.push({
-						expression,
-						element: el,
-						update: (value) => {
-							el.style[styleProp] = value ?? '';
-						},
-					});
-				} else if (bindingAttr === 'html') {
-					this.#bindings.push({
-						expression,
-						element: el,
-						update: (value) => {
-							el.innerHTML = value ?? '';
-						},
-					});
-				} else {
-					const propName = kebabToCamel(bindingAttr);
-
-					this.#bindings.push({
-						expression,
-						element: el,
-						update: (value) => {
+				const binding = {
+					expression,
+					element: el,
+					update: (value) => {
+						if (value === EVALUATION_ERROR) {
+							el[propName] = null;
+						} else {
 							el[propName] = value;
-						},
-					});
-				}
+						}
+					},
+				};
+
+				this.#bindings.push(binding);
+				this.#registerBinding(binding);
 			}
 		}
 
@@ -553,7 +1319,11 @@ export default class Component extends HTMLElement {
 
 					while (parent && parent !== root) {
 						if (parent instanceof Component) {
-							return NodeFilter.FILTER_REJECT;
+							const componentShadowRoot = parent.shadowRoot;
+
+							if (componentShadowRoot && componentShadowRoot.contains(innerNode)) {
+								return NodeFilter.FILTER_REJECT;
+							}
 						}
 
 						parent = parent.parentElement;
@@ -583,13 +1353,20 @@ export default class Component extends HTMLElement {
 					const expression = part.slice(2, -2).trim(),
 						newTextNode = document.createTextNode('');
 
-					this.#bindings.push({
+					const binding = {
 						expression,
 						element: newTextNode,
 						update: (value) => {
-							newTextNode.textContent = value ?? '';
+							if (value === EVALUATION_ERROR) {
+								newTextNode.textContent = '';
+							} else {
+								newTextNode.textContent = value ?? '';
+							}
 						},
-					});
+					};
+
+					this.#bindings.push(binding);
+					this.#registerBinding(binding); // NEW: Register for tracking
 
 					replacements.push(newTextNode);
 				} else {
@@ -604,18 +1381,75 @@ export default class Component extends HTMLElement {
 	/**
 	 * Parses and evaluates a template in a specific context (used for for-each loops).
 	 * Immediately evaluates bindings rather than storing them for later updates.
-	 * Also processes if directives within the loop context.
+	 * Also processes if directives and nested for-each directives within the loop context.
 	 * @param {DocumentFragment|HTMLElement} root - The root element to parse
 	 * @param {Object<string, any>} context - The context object containing loop variables
 	 * @private
 	 */
 	#parseTemplateInContext(root, context) {
-		// First, handle if directives within this context
-		const ifElements = root.querySelectorAll ? root.querySelectorAll('[if]') : [],
+		// First, handle nested for-each directives (MUST be done before if directives)
+		const forElements = root.querySelectorAll ? root.querySelectorAll('[for-each]') : [],
+			// Second, handle if directives within this context
+			ifElements = root.querySelectorAll ? root.querySelectorAll('[if]') : [],
 			textNodes = [];
 		let iter = null,
 			node = null,
 			elements = [];
+
+		for (const el of forElements) {
+			const forExpr = el.getAttribute('for-each'),
+				[itemName, itemsExpr] = forExpr.split(' in ').map((s) => s.trim()),
+				placeholder = document.createComment('for-each'),
+				template = document.importNode(el, true);
+
+			template.removeAttribute('for-each');
+			el.parentElement.insertBefore(placeholder, el);
+			el.remove();
+
+			// CRITICAL FIX: Register nested for-each as a directive so it can update
+			const directive = {
+				itemsExpr,
+				itemName,
+				placeholder,
+				template,
+				parentContext: context, // Store parent context for nested evaluation
+			};
+
+			this.#forEachDirectives.push(directive);
+			this.#registerForEachDirective(directive);
+
+			// Store the parent loop context on the placeholder itself for easy access
+			// This ensures #getLoopContext can find it even if placeholder moves
+			placeholder.sprooLoopContext = context;
+
+			// Evaluate the items expression in the current context for initial render
+			try {
+				const items = this.#evaluateExpression(itemsExpr, context);
+
+				if (Array.isArray(items)) {
+					// Process each item immediately in this context
+					for (const [index, item] of items.entries()) {
+						const clone = document.importNode(template, true),
+							nestedContext = {
+								...context,
+								[itemName]: item,
+								index,
+							};
+
+						clone.sprooForEachItem = true;
+						clone.sprooLoopContext = nestedContext;
+
+						placeholder.parentElement.insertBefore(clone, placeholder);
+
+						// Recursively parse the cloned template with the nested context
+						this.#parseTemplateInContext(clone, nestedContext);
+					}
+				}
+			} catch (e) {
+				// Log nested for-each evaluation errors
+				console.warn(`[Sproo] Nested for-each evaluation error: "${ itemsExpr }"`, e);
+			}
+		}
 
 		for (const el of ifElements) {
 			const condition = el.getAttribute('if'),
@@ -664,12 +1498,15 @@ export default class Component extends HTMLElement {
 
 							binding.update(value);
 						} catch (e) {
-							// Skip if can't evaluate
+							// Log error and clear stale data
+							console.warn(`[Sproo] Loop context if directive binding error: "${ binding.expression }"`, e);
+							binding.update(null);
 						}
 					}
 				}
 			} catch (e) {
-				// Skip if evaluation fails
+				// Log if directive evaluation errors
+				console.warn(`[Sproo] Loop context if directive evaluation error: "${ condition }"`, e);
 			}
 		}
 
@@ -698,6 +1535,8 @@ export default class Component extends HTMLElement {
 
 						replacements.push(document.createTextNode(value ?? ''));
 					} catch (e) {
+						// Log error and insert empty text
+						console.warn(`[Sproo] Loop context text interpolation error: "${ expression }"`, e);
 						replacements.push(document.createTextNode(''));
 					}
 				} else {
@@ -718,6 +1557,44 @@ export default class Component extends HTMLElement {
 			const attrs = el.getAttributeNames ? el.getAttributeNames() : [];
 
 			for (const attr of attrs) {
+				if (attr.startsWith(':')) {
+					const actualAttr = attr.slice(1);
+					const expression = el.getAttribute(attr);
+
+					try {
+						const value = this.#evaluateExpression(expression, context);
+
+						if (actualAttr === 'innerHTML') {
+							el.innerHTML = value ?? '';
+						} else if (actualAttr.startsWith('class.')) {
+							const className = actualAttr.substring(6);
+
+							if (value) {
+								el.classList.add(className);
+							} else {
+								el.classList.remove(className);
+							}
+						} else if (value !== null && typeof value !== 'undefined') {
+							// Set property first if special handling is needed
+							if (PROPERTY_BINDINGS[actualAttr]) {
+								PROPERTY_BINDINGS[actualAttr](el, value);
+							}
+
+							// Always set the attribute as well
+							el.setAttribute(actualAttr, value);
+						} else {
+							// Clear property for null/undefined values
+							if (PROPERTY_BINDINGS[actualAttr]) {
+								PROPERTY_BINDINGS[actualAttr](el, '');
+							}
+						}
+					} catch (e) {
+						console.warn(`[Sproo] Loop context attribute binding error: "${ expression }"`, e);
+					}
+
+					continue;
+				}
+
 				if (!attr.startsWith('[') || !attr.endsWith(']')) {
 					continue;
 				}
@@ -728,25 +1605,11 @@ export default class Component extends HTMLElement {
 					const value = this.#evaluateExpression(expression, context),
 						bindingAttr = attr.slice(1, -1);
 
-					if (bindingAttr.startsWith('attr.')) {
-						const actualAttr = bindingAttr.substring(5);
+					const propName = kebabToCamel(bindingAttr);
 
-						if (value !== null && typeof value !== 'undefined') {
-							el.setAttribute(actualAttr, value);
-						}
-					} else if (bindingAttr.startsWith('style.')) {
-						const styleProp = bindingAttr.substring(6);
-
-						el.style[styleProp] = value ?? '';
-					} else if (bindingAttr === 'html') {
-						el.innerHTML = value ?? '';
-					} else {
-						const propName = kebabToCamel(bindingAttr);
-
-						el[propName] = value;
-					}
+					el[propName] = value;
 				} catch (e) {
-					// Skip if can't evaluate
+					console.warn(`[Sproo] Loop context attribute binding error: "${ expression }"`, e);
 				}
 			}
 		}
@@ -765,21 +1628,57 @@ export default class Component extends HTMLElement {
 	 * @private
 	 */
 	#evaluateExpression(expression, additionalContext = {}) {
-		if (SIMPLE_PROPERTY_REGEX.test(expression) && !expression.includes('(')) {
-			return this.#getProperty(expression, additionalContext);
+		const perfTimer = this.#perfStart('Evaluate Expression');
+
+		try {
+			if (SIMPLE_PROPERTY_REGEX.test(expression) && !expression.includes('(')) {
+				const result = this.#getProperty(expression, additionalContext);
+
+				this.#perfEnd(perfTimer, {
+					expression,
+					type: 'property',
+					success: true,
+				});
+
+				return result;
+			}
+
+			const context = {...this.#getContext(), ...additionalContext},
+				methods = this.#getMethods(),
+				fullContext = {...context, ...methods},
+
+				args = Object.keys(fullContext),
+				values = Object.values(fullContext),
+				// We need eval here, one way or another.
+				// eslint-disable-next-line no-new-func
+				func = new Function(...args, `return ${ expression }`);
+
+			const result = func.apply(this, values);
+
+			this.#perfEnd(perfTimer, {
+				expression,
+				type: 'function',
+				success: true,
+			});
+
+			return result;
+		} catch (error) {
+			this.#perfEnd(perfTimer, {
+				expression,
+				type: 'error',
+				error: error.message,
+			});
+
+			// Log warning similar to Vue's behavior
+			if (this.logger && this.logger.warn) {
+				this.logger.warn(`Error evaluating expression "${ expression }":`, error.message);
+			} else {
+				console.warn(`[Sproo] Error evaluating expression "${ expression }":`, error.message);
+			}
+
+			// Return error symbol to signal failed evaluation
+			return EVALUATION_ERROR;
 		}
-
-		const context = {...this.#getContext(), ...additionalContext},
-			methods = this.#getMethods(),
-			fullContext = {...context, ...methods},
-
-			args = Object.keys(fullContext),
-			values = Object.values(fullContext),
-			// We need eval here, one way or another.
-			// eslint-disable-next-line no-new-func
-			func = new Function(...args, `return ${ expression }`);
-
-		return func.apply(this, values);
 	}
 
 	/**
@@ -791,25 +1690,36 @@ export default class Component extends HTMLElement {
 	 * @private
 	 */
 	#getProperty(path, additionalContext = {}) {
-		const parts = path.split('.').map((p) => p.replace(/\?/gu, ''));
+		try {
+			const parts = path.split('.').map((p) => p.replace(/\?/gu, ''));
 
-		if (typeof additionalContext[parts[0]] !== 'undefined') {
-			let value = additionalContext[parts[0]];
+			if (typeof additionalContext[parts[0]] !== 'undefined') {
+				let value = additionalContext[parts[0]];
+
+				for (let i = 1; i < parts.length && value; i += 1) {
+					value = value[parts[i]];
+				}
+
+				return value;
+			}
+
+			let value = this[`_${ parts[0] }`] ?? this[parts[0]];
 
 			for (let i = 1; i < parts.length && value; i += 1) {
 				value = value[parts[i]];
 			}
 
 			return value;
+		} catch (error) {
+			// Log warning for property access errors
+			if (this.logger && this.logger.warn) {
+				this.logger.warn(`Error accessing property "${ path }":`, error.message);
+			} else {
+				console.warn(`[Sproo] Error accessing property "${ path }":`, error.message);
+			}
+
+			return EVALUATION_ERROR;
 		}
-
-		let value = this[`_${ parts[0] }`] ?? this[parts[0]];
-
-		for (let i = 1; i < parts.length && value; i += 1) {
-			value = value[parts[i]];
-		}
-
-		return value;
 	}
 
 	/**
@@ -892,7 +1802,60 @@ export default class Component extends HTMLElement {
 	}
 
 	/**
-	 * Parses event handlers from elements with (eventName) attributes.
+	 * Start performance measurement
+	 * @param {string} label - Label for this measurement
+	 * @returns {Object} Timer object with start time and metadata
+	 * @private
+	 */
+	#perfStart(label) {
+		if (!this.constructor.performanceTracking) {
+			return null;
+		}
+
+		return {
+			label,
+			start: performance.now(),
+			component: this.constructor.name,
+			memory: performance.memory ? performance.memory.usedJSHeapSize : null,
+		};
+	}
+
+	/**
+	 * End performance measurement and optionally log
+	 * @param {Object} timer - Timer object from #perfStart
+	 * @param {Object} metadata - Additional data to log
+	 * @private
+	 */
+	#perfEnd(timer, metadata = {}) {
+		if (!timer) {
+			return;
+		}
+
+		const duration = performance.now() - timer.start;
+		const memoryDelta = performance.memory
+			? performance.memory.usedJSHeapSize - timer.memory
+			: null;
+
+		const logEntry = {
+			label: timer.label,
+			component: timer.component,
+			duration: duration.toFixed(2),
+			timestamp: (new Date).toISOString(),
+			memoryDelta: memoryDelta ? `${ (memoryDelta / 1024).toFixed(2) } KB` : 'N/A',
+			...metadata,
+		};
+
+		this.constructor.performanceLog.push(logEntry);
+
+		if (duration > this.constructor.performanceThreshold) {
+			console.warn(`[Sproo Perf] ${ timer.label } took ${ duration.toFixed(2) }ms`, logEntry);
+		}
+
+		return logEntry;
+	}
+
+	/**
+	 * Parses event handlers from elements with @eventName attributes.
 	 * Sets up event listeners that call component methods.
 	 * @param {DocumentFragment|HTMLElement} root - The root element to parse for event handlers
 	 * @param {Object<string, any>} [context=null] - Optional context for event handlers (e.g., loop context)
@@ -909,42 +1872,41 @@ export default class Component extends HTMLElement {
 			const attrs = el.getAttributeNames ? el.getAttributeNames() : [];
 
 			for (const attr of attrs) {
-				if (!attr.startsWith('(') || !attr.endsWith(')')) {
-					continue;
-				}
+				// Event handler: @click="handler"
+				if (attr.startsWith('@')) {
+					const eventName = attr.slice(1).trim();
+					const handlerName = el.getAttribute(attr);
 
-				const eventName = attr.slice(1, -1).trim(),
-					handlerName = el.getAttribute(attr);
-
-				if (typeof this[handlerName] === 'function') {
-					if (el.sprooEventListeners && el.sprooEventListeners[eventName]) {
-						el.removeEventListener(eventName, el.sprooEventListeners[eventName]);
-					}
-
-					const handler = (ev) => {
-						let result = null;
-
-						if (context) {
-							result = this[handlerName](ev, context);
-						} else if (el.sprooLoopContext) {
-							result = this[handlerName](ev, el.sprooLoopContext);
-						} else {
-							result = this[handlerName](ev);
+					if (typeof this[handlerName] === 'function') {
+						if (el.sprooEventListeners && el.sprooEventListeners[eventName]) {
+							el.removeEventListener(eventName, el.sprooEventListeners[eventName]);
 						}
 
-						if (result === false) {
-							ev.preventDefault();
-							ev.stopPropagation();
+						const handler = (ev) => {
+							let result = null;
+
+							if (context) {
+								result = this[handlerName](ev, context);
+							} else if (el.sprooLoopContext) {
+								result = this[handlerName](ev, el.sprooLoopContext);
+							} else {
+								result = this[handlerName](ev);
+							}
+
+							if (result === false) {
+								ev.preventDefault();
+								ev.stopPropagation();
+							}
+						};
+
+						el.addEventListener(eventName, handler);
+
+						if (!el.sprooEventListeners) {
+							el.sprooEventListeners = {};
 						}
-					};
 
-					el.addEventListener(eventName, handler);
-
-					if (!el.sprooEventListeners) {
-						el.sprooEventListeners = {};
+						el.sprooEventListeners[eventName] = handler;
 					}
-
-					el.sprooEventListeners[eventName] = handler;
 				}
 			}
 		}
@@ -1190,5 +2152,94 @@ export default class Component extends HTMLElement {
 		if (typeof element.remove === 'function') {
 			element.remove();
 		}
+	}
+
+	/**
+	 * Get performance summary
+	 * @returns {Object} Summary statistics
+	 */
+	static getPerformanceSummary() {
+		if (this.performanceLog.length === 0) {
+			return {message: 'No performance data collected'};
+		}
+
+		const byLabel = {};
+
+		for (const entry of this.performanceLog) {
+			if (!byLabel[entry.label]) {
+				byLabel[entry.label] = {
+					count: 0,
+					totalDuration: 0,
+					maxDuration: 0,
+					minDuration: Infinity,
+				};
+			}
+
+			const duration = parseFloat(entry.duration);
+
+			byLabel[entry.label].count++;
+			byLabel[entry.label].totalDuration += duration;
+			byLabel[entry.label].maxDuration = Math.max(byLabel[entry.label].maxDuration, duration);
+			byLabel[entry.label].minDuration = Math.min(byLabel[entry.label].minDuration, duration);
+		}
+
+		// Calculate averages
+		for (const label in byLabel) {
+			byLabel[label].avgDuration = (byLabel[label].totalDuration / byLabel[label].count).toFixed(2);
+			byLabel[label].totalDuration = byLabel[label].totalDuration.toFixed(2);
+			byLabel[label].maxDuration = byLabel[label].maxDuration.toFixed(2);
+			byLabel[label].minDuration = byLabel[label].minDuration.toFixed(2);
+		}
+
+		return byLabel;
+	}
+
+	/**
+	 * Print performance summary to console
+	 */
+	static printPerformanceSummary() {
+		const summary = this.getPerformanceSummary();
+
+		console.log('=== Sproo Performance Summary ===');
+		console.table(summary);
+
+		// Find slowest operations
+		const sorted = Object.entries(summary).sort((a, b) =>
+			parseFloat(b[1].totalDuration) - parseFloat(a[1].totalDuration),
+		);
+
+		if (sorted.length > 0) {
+			console.log('\n=== Top 10 Slowest Operations (by total time) ===');
+			console.table(sorted.slice(0, 10).reduce((acc, [label, stats]) => {
+				acc[label] = stats;
+
+				return acc;
+			}, {}));
+		}
+	}
+
+	/**
+	 * Clear performance log
+	 */
+	static clearPerformanceLog() {
+		this.performanceLog = [];
+		console.log('[Sproo] Performance log cleared');
+	}
+
+	/**
+	 * Export performance log as JSON
+	 * @returns {string} JSON string of performance log
+	 */
+	static exportPerformanceLog() {
+		return JSON.stringify(this.performanceLog, null, 2);
+	}
+
+	/**
+	 * Get entries by component name
+	 * @param {string} componentName - Component name to filter by
+	 * @returns {Array} Filtered performance entries
+	 */
+	static getPerformanceByComponent(componentName) {
+		return this.performanceLog.filter((entry) => entry.component === componentName);
 	}
 }
