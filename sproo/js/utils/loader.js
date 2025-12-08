@@ -80,6 +80,14 @@ export default class Loader {
 				});
 			}).catch((error) => {
 				console.error(`Loader.getCSS error: ${ error.message }`);
+				Loader.cssQueue[stylesheetPath].forEach((queuedResolve) => {
+					try {
+						queuedResolve(null);
+					} catch (callbackError) {
+						console.error('Error in queued CSS error callback:', callbackError);
+					}
+				});
+				delete Loader.cssQueue[stylesheetPath];
 			}));
 		}
 	}

@@ -1,5 +1,5 @@
 import {camelToKebab} from './utils/text.js';
-import App from './app.js';
+import services from './services.js';
 
 
 export default class Router {
@@ -22,19 +22,6 @@ export default class Router {
 	#beforeNavigateCallbacks = [];
 	#afterNavigateCallbacks = [];
 
-	/**
-	 * Creates a new Router instance. Only one instance is allowed.
-	 * @param {string} routeRoot - Root path for all routes
-	 * @param {Object} homePage - Home page configuration
-	 * @param {string} homePage.component - Path to home page component
-	 * @param {Object} [homePage.meta] - Home page metadata
-	 * @param {Object} notFound - 404-page configuration
-	 * @param {string} notFound.component - Path to 404 component
-	 * @param {Object} [notFound.meta] - 404-page metadata
-	 * @param {Array<Object>} routes - Route definitions
-	 * @param {string} [authenticationUrl] - URL to redirect for authentication
-	 * @throws {Error} If another Router instance exists
-	 */
 	constructor(routeRoot, homePage, notFound, routes, authenticationUrl) {
 		if (Router.instance) {
 			throw new Error('Only one instance of Router allowed');
@@ -42,13 +29,12 @@ export default class Router {
 
 		Router.instance = this;
 
-		this.routeRoot = `${ window.location.protocol }//${ window.location.host }${ routeRoot }`;
+		this.routeRoot = `${window.location.protocol}//${window.location.host}${routeRoot}`;
 		this.authenticationUrl = authenticationUrl;
 
 		this.#onPopStateBound = this.#onPopState.bind(this);
 		window.addEventListener('popstate', this.#onPopStateBound);
 
-		// Back/forward cache (bfcache) support
 		this.#onPageShowBound = this.#onPageShow.bind(this);
 		window.addEventListener('pageshow', this.#onPageShowBound);
 
@@ -62,11 +48,6 @@ export default class Router {
 		this.resolve();
 	}
 
-	/**
-	 * Sets up the home page route
-	 * @param {Object} homePage - Home page configuration
-	 * @private
-	 */
 	#setupHomeRoute(homePage) {
 		this.homePageRoute = {
 			handler: async () => {
@@ -76,11 +57,6 @@ export default class Router {
 		};
 	}
 
-	/**
-	 * Sets up the 404 not found route
-	 * @param {Object} notFound - Not found page configuration
-	 * @private
-	 */
 	#setupNotFoundRoute(notFound) {
 		this.notFoundRoute = {
 			handler: async () => {
@@ -90,11 +66,6 @@ export default class Router {
 		};
 	}
 
-	/**
-	 * Sets up all application routes
-	 * @param {Array<Object>} routes - Route definitions
-	 * @private
-	 */
 	#setupRoutes(routes) {
 		if (!Array.isArray(routes)) {
 			return;
@@ -129,14 +100,6 @@ export default class Router {
 		});
 	}
 
-	/**
-	 * Executes a route guard
-	 * @param {Object} route - Route configuration
-	 * @param {Array} params - Route parameters
-	 * @param {Object} queryParams - Query parameters
-	 * @returns {Promise<{allowed: boolean, redirect?: string}>} Guard result
-	 * @private
-	 */
 	async #executeGuard(route, params, queryParams) {
 		try {
 			const guardModule = await import(route.guard),
@@ -144,12 +107,11 @@ export default class Router {
 				result = await guard.guard(this, route, params, queryParams);
 
 			if (!guardModule?.default) {
-				console.error(`Guard module ${ route.guard } does not have a default export`);
+				console.error(`Guard module ${route.guard} does not have a default export`);
 
 				return {allowed: false};
 			}
 
-			// Guard can return boolean or object with redirect
 			if (typeof result === 'boolean') {
 				return {allowed: result};
 			}
@@ -169,10 +131,6 @@ export default class Router {
 		}
 	}
 
-	/**
-	 * Destroys the router and cleans up resources
-	 * @public
-	 */
 	destroy() {
 		this.destroyed = true;
 		this.routes = [];
@@ -191,13 +149,6 @@ export default class Router {
 		Router.instance = null;
 	}
 
-	/**
-	 * Adds a route to the router
-	 * @param {string|RegExp} route - Route pattern
-	 * @param {Function} [handler=null] - Route handler function
-	 * @param {Object} [meta=null] - Route metadata
-	 * @public
-	 */
 	add(route, handler = null, meta = null) {
 		let internalRoute = '';
 
@@ -214,15 +165,7 @@ export default class Router {
 		});
 	}
 
-	/**
-	 * Navigates to a new location
-	 * @param {string} location - The path to navigate to
-	 * @param {Object} [data={}] - Additional state data
-	 * @returns {Promise<void>} Resolves when navigation is complete
-	 * @public
-	 */
 	async navigate(location, data = {}) {
-		// Queue navigation if already navigating
 		if (this.#navigating) {
 			return new Promise((resolve) => {
 				this.#navigationQueue.push({
@@ -238,9 +181,7 @@ export default class Router {
 		try {
 			const internalLocation = location || '',
 				url = this.#buildUrl(internalLocation),
-				// Get current state before navigation
 				previousUrl = window.location.href.replace(window.location.origin, ''),
-				// Call before navigate callbacks
 				shouldContinue = await this.#callBeforeNavigate(url, previousUrl),
 				internalData = {
 					previousUrl,
@@ -254,7 +195,6 @@ export default class Router {
 			window.history.pushState(internalData, '', url);
 			await this.resolve();
 
-			// Call after navigate callbacks
 			await this.#callAfterNavigate(url, previousUrl);
 
 			return null;
@@ -268,32 +208,17 @@ export default class Router {
 		}
 	}
 
-	/**
-	 * Navigates to the 404 page
-	 * @returns {Promise<void>} Resolves when navigation is complete
-	 * @public
-	 */
 	async navigateToNotFound() {
 		if (this.notFoundRoute) {
 			await this.notFoundRoute.handler();
 		}
 	}
 
-	/**
-	 * Builds a complete URL from a location string
-	 * @param {string} location - The location path
-	 * @returns {string} Complete URL
-	 * @private
-	 */
 	#buildUrl(location) {
-		return `${ this.routeRoot }/${ location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/') }`
+		return `${this.routeRoot}/${location.replace(RouterUtils.CLEAN_LEADING_SLASH, '/')}`
 			.replace(/([^:])(\/{2,})/gu, '$1/');
 	}
 
-	/**
-	 * Processes queued navigations
-	 * @private
-	 */
 	#processNavigationQueue() {
 		if (this.#navigationQueue.length > 0) {
 			const next = this.#navigationQueue.shift();
@@ -302,13 +227,6 @@ export default class Router {
 		}
 	}
 
-	/**
-	 * Calls all before navigate callbacks
-	 * @param {string} toUrl - Destination URL
-	 * @param {string} fromUrl - Current URL
-	 * @returns {Promise<boolean>} True if navigation should continue
-	 * @private
-	 */
 	async #callBeforeNavigate(toUrl, fromUrl) {
 		for (const callback of this.#beforeNavigateCallbacks) {
 			try {
@@ -325,13 +243,6 @@ export default class Router {
 		return true;
 	}
 
-	/**
-	 * Calls all after navigate callbacks
-	 * @param {string} toUrl - Destination URL
-	 * @param {string} fromUrl - Previous URL
-	 * @returns {Promise<void>}
-	 * @private
-	 */
 	async #callAfterNavigate(toUrl, fromUrl) {
 		for (const callback of this.#afterNavigateCallbacks) {
 			try {
@@ -342,34 +253,18 @@ export default class Router {
 		}
 	}
 
-	/**
-	 * Registers a callback to be called before navigation
-	 * @param {Function} callback - Callback function (toUrl, fromUrl) => boolean|Promise<boolean>
-	 * @public
-	 */
 	beforeNavigate(callback) {
 		if (typeof callback === 'function') {
 			this.#beforeNavigateCallbacks.push(callback);
 		}
 	}
 
-	/**
-	 * Registers a callback to be called after navigation
-	 * @param {Function} callback - Callback function (toUrl, fromUrl) => void|Promise<void>
-	 * @public
-	 */
 	afterNavigate(callback) {
 		if (typeof callback === 'function') {
 			this.#afterNavigateCallbacks.push(callback);
 		}
 	}
 
-	/**
-	 * Matches a path against registered routes
-	 * @param {string} path - Path to match
-	 * @returns {Object|null} Match result with route, params, and query params
-	 * @public
-	 */
 	match(path) {
 		const cleanedPath = path.replace(RouterUtils.CLEAN_LEADING_SLASH, '/'),
 			[pathWithoutQuery, queryString] = cleanedPath.split('?'),
@@ -400,12 +295,6 @@ export default class Router {
 		return null;
 	}
 
-	/**
-	 * Resolves and handles the current URL
-	 * @param {string} [current] - URL to resolve (defaults to current location)
-	 * @returns {Promise<void>} Resolves when route is handled
-	 * @public
-	 */
 	async resolve(current) {
 		if (this.destroyed) {
 			return;
@@ -414,7 +303,6 @@ export default class Router {
 		const url = current || RouterUtils.clean(window.location.href),
 			path = RouterUtils.splitURL(url.replace(this.routeRoot, ''));
 
-		// Prevent duplicate resolution
 		if (this.lastRouteResolved?.path === path && !current) {
 			return;
 		}
@@ -430,10 +318,20 @@ export default class Router {
 					queryParams: match.queryParams,
 				};
 				await match.route.handler(match.params, match.queryParams);
+
+				if (this.destroyed) {
+					return;
+				}
+
 				title = match.route.meta?.title;
 			} else if (RouterUtils.clean(path) === '' && this.homePageRoute) {
 				this.lastRouteResolved = {path};
 				await this.homePageRoute.handler();
+
+				if (this.destroyed) {
+					return;
+				}
+
 				title = this.homePageRoute.meta?.title;
 			} else if (this.notFoundRoute) {
 				this.lastRouteResolved = {
@@ -441,6 +339,11 @@ export default class Router {
 					notFound: true,
 				};
 				await this.notFoundRoute.handler();
+
+				if (this.destroyed) {
+					return;
+				}
+
 				title = this.notFoundRoute.meta?.title;
 			}
 
@@ -448,9 +351,12 @@ export default class Router {
 				document.title = title;
 			}
 		} catch (error) {
+			if (this.destroyed) {
+				return;
+			}
+
 			console.error('Route resolution failed:', error);
 
-			// Fallback to 404 if available and not already showing it
 			if (this.notFoundRoute && !this.lastRouteResolved?.notFound) {
 				this.lastRouteResolved = {
 					path,
@@ -461,30 +367,14 @@ export default class Router {
 		}
 	}
 
-	/**
-	 * Handles browser back/forward navigation
-	 * @param {PopStateEvent} event - The popstate event
-	 * @private
-	 */
 	#onPopState(event) {
 		this.resolve(event.target.location.href);
 	}
 
-	/**
-	 * Handles pageshow event for bfcache restoration
-	 * @param {PageTransitionEvent} event - The pageshow event
-	 * @private
-	 */
 	#onPageShow(event) {
 		if (event.persisted) {
-			// Page was restored from bfcache (back/forward cache)
-			console.log('[Router] Page restored from bfcache');
-
-			// Re-resolve the current route to ensure everything is up to date
 			this.resolve();
 
-			// Dispatch a custom event that components can listen to
-			// This allows components to refresh time-sensitive data
 			window.dispatchEvent(new CustomEvent('bfcache-restore', {
 				detail: {
 					route: this.lastRouteResolved,
@@ -494,27 +384,15 @@ export default class Router {
 		}
 	}
 
-	/**
-	 * Handles pagehide event before bfcache entry
-	 * @param {PageTransitionEvent} event - The pagehide event
-	 * @private
-	 */
+	// eslint-disable-next-line class-methods-use-this
 	#onPageHide(event) {
 		if (event.persisted) {
 			// Page is about to enter bfcache
-			console.log('[Router] Page entering bfcache');
-
-			// The browser will automatically pause timers and animations
-			// Only add cleanup here if you have specific requirements
 		}
 	}
 }
 
 
-/**
- * Utility class for router operations
- * @private
- */
 class RouterUtils {
 	static CLEAN_TRAILING_SLASH = /\/+$/u;
 	static CLEAN_LEADING_SLASH = /^\/+/u;
@@ -525,12 +403,6 @@ class RouterUtils {
 	static REPLACE_WILDCARD = '(?:.*)';
 	static FOLLOWED_BY_SLASH_REGEXP = '(?:/$|$)';
 
-	/**
-	 * Cleans a URL by removing trailing slashes and hash
-	 * @param {string} url - URL to clean
-	 * @returns {string} Cleaned URL
-	 * @static
-	 */
 	static clean(url) {
 		return url
 			.replace(RouterUtils.CLEAN_TRAILING_SLASH, '')
@@ -538,22 +410,10 @@ class RouterUtils {
 			.split('#')[0];
 	}
 
-	/**
-	 * Splits URL to remove query parameters
-	 * @param {string} url - URL to split
-	 * @returns {string} URL without query parameters
-	 * @static
-	 */
 	static splitURL(url) {
 		return url.split(RouterUtils.SPLIT_GET_PARAMETERS)[0];
 	}
 
-	/**
-	 * Parses query parameters from a query string
-	 * @param {string} queryString - Query string to parse
-	 * @returns {Object<string, string>} Parsed query parameters
-	 * @static
-	 */
 	static getQueryParams(queryString) {
 		if (!queryString) {
 			return {};
@@ -572,12 +432,6 @@ class RouterUtils {
 		}, {});
 	}
 
-	/**
-	 * Converts a route pattern to a RegExp and extracts parameter names
-	 * @param {string|RegExp} route - Route pattern
-	 * @returns {{regexp: RegExp, paramNames: Array<string>}} RegExp and parameter names
-	 * @static
-	 */
 	static replaceDynamicURLParts(route) {
 		const paramNames = [];
 		let regexp = null;
@@ -604,13 +458,6 @@ class RouterUtils {
 		};
 	}
 
-	/**
-	 * Converts RegExp match results to parameter object
-	 * @param {Array} match - RegExp match results
-	 * @param {Array<string>} names - Parameter names
-	 * @returns {Array<string>|null} Parameter values
-	 * @static
-	 */
 	static regExpResultToParams(match, names) {
 		if (names.length === 0 || !match) {
 			return null;
@@ -625,14 +472,6 @@ class RouterUtils {
 		}, null);
 	}
 
-	/**
-	 * Injects a component into the router outlet
-	 * @param {string | Function} componentOrLoader - Path to component module
-	 * @param {...any} params - Parameters to pass to component constructor
-	 * @returns {Promise<HTMLElement>} The created component instance
-	 * @throws {Error} If outlet not found or component fails to load
-	 * @static
-	 */
 	static async inject(componentOrLoader, ...params) {
 		const outlet = document.querySelector('router-outlet');
 		let children = null;
@@ -641,12 +480,10 @@ class RouterUtils {
 			throw new Error('Page must contain <router-outlet> element');
 		}
 
-		// Clean up existing components
 		children = Array.from(outlet.children);
 
 		for (const child of children) {
 			if (child instanceof HTMLElement) {
-				// Trigger proper cleanup if it's a Component
 				if (typeof child.disconnectedCallback === 'function') {
 					child.disconnectedCallback();
 				}
@@ -661,18 +498,22 @@ class RouterUtils {
 				tagName = '';
 
 			if (typeof componentOrLoader === 'function') {
-				module = await componentOrLoader(); // Lazy load
+				module = await componentOrLoader();
 			} else {
-				module = await import(componentOrLoader); // Eager load
+				module = await import(componentOrLoader);
 			}
 
 			if (!module?.default) {
-				throw new Error(`Module ${ componentOrLoader } does not have a valid default export`);
+				throw new Error(`Module ${componentOrLoader} does not have a valid default export`);
 			}
 
-			tagName = `${ App.appName }-${ camelToKebab(module.default.name.replace('Component', '')) }`;
+			if (!services.appName) {
+				// App has been destroyed during async operation - silently abort
+				return null;
+			}
 
-			// Register custom element if not already registered
+			tagName = `${services.appName}-${camelToKebab(module.default.name.replace('Component', ''))}`;
+
 			if (!customElements.get(tagName)) {
 				customElements.define(tagName, module.default);
 			}
@@ -683,7 +524,7 @@ class RouterUtils {
 
 			return newComponent;
 		} catch (error) {
-			console.error(`Failed to inject component ${ componentOrLoader }:`, error);
+			console.error(`Failed to inject component ${componentOrLoader}:`, error);
 
 			throw error;
 		}

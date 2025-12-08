@@ -21,7 +21,7 @@ const html = new utils.HtmlStatic(`<header>
  *
  * The tag accepts one attribute: title
  *
- * You may also bind the title ([title]="myTitle") and change it dynamically from the parent component. The slotted content
+ * You may also bind the title (:title="myTitle") and change it dynamically from the parent component. The slotted content
  * gets changed from the parent component by default.
  */
 class BazaCardComponent extends BazaComponent {
